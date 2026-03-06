@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>あかり シフト管理</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', 'Yu Gothic', sans-serif;
+      background: #f5f0eb;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .logo {
+      font-size: 28px;
+      font-weight: bold;
+      color: #6b3a2a;
+      letter-spacing: 4px;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #999;
+      letter-spacing: 2px;
+      margin-bottom: 48px;
+    }
+
+    .cards {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 600px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 32px 28px;
+      text-align: center;
+      text-decoration: none;
+      color: inherit;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      width: 220px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      border: 2px solid transparent;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+
+    .card-icon  { font-size: 40px; margin-bottom: 14px; }
+    .card-title { font-size: 16px; font-weight: bold; margin-bottom: 8px; }
+    .card-desc  { font-size: 11px; color: #888; line-height: 1.6; }
+
+    .card.admin:hover { border-color: #c49a7a; }
+    .card.staff:hover { border-color: #7aaac4; }
+
+    .card.admin .card-title { color: #6b3a2a; }
+    .card.staff .card-title { color: #2a4a6b; }
+
+    footer {
+      margin-top: 48px;
+      font-size: 10px;
+      color: #bbb;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="logo">あかり</div>
+  <div class="subtitle">シフト管理システム</div>
+
+  <div class="cards">
+    <a href="admin.html" class="card admin">
+      <div class="card-icon">📋</div>
+      <div class="card-title">管理者ページ</div>
+      <div class="card-desc">シフト作成・希望確認<br>スタッフ設定・自動割り振り</div>
+    </a>
+    <a href="staff.html" class="card staff">
+      <div class="card-icon">📅</div>
+      <div class="card-title">スタッフページ</div>
+      <div class="card-desc">休み希望の申請<br>スタッフ専用</div>
+    </a>
+  </div>
+
+  <footer>AKARI SHIFT MANAGEMENT</footer>
+
+</body>
+</html>

@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>シフト | スタッフ</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', 'Yu Gothic', sans-serif;
+      background: #f5f0eb;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255,255,255,0.75);
+      z-index: 9000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: #6b3a2a;
+    }
+    .loading-overlay.hidden { display: none; }
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid #e0d0c8;
+      border-top-color: #6b3a2a;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    header {
+      background: #6b3a2a;
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .header-title { font-size: 15px; font-weight: bold; }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .header-name  { font-size: 12px; color: #ffccaa; }
+    .logout-btn {
+      font-size: 11px;
+      color: #ffccaa;
+      background: none;
+      border: 1px solid #ffccaa;
+      padding: 3px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .logout-btn:hover { background: rgba(255,255,255,0.1); }
+
+    /* ===== Login screen ===== */
+    .login-screen {
+      max-width: 400px;
+      margin: 48px auto 0;
+      padding: 0 20px;
+    }
+    .login-logo {
+      text-align: center;
+      font-size: 26px;
+      font-weight: bold;
+      color: #6b3a2a;
+      letter-spacing: 4px;
+      margin-bottom: 4px;
+    }
+    .login-subtitle {
+      text-align: center;
+      font-size: 11px;
+      color: #aaa;
+      letter-spacing: 2px;
+      margin-bottom: 28px;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px 24px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .login-card-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #6b3a2a;
+      margin-bottom: 18px;
+      text-align: center;
+    }
+    .login-field { margin-bottom: 14px; }
+    .login-label { font-size: 11px; color: #888; margin-bottom: 4px; display: block; }
+    .login-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .login-input:focus { outline: none; border-color: #c49a7a; }
+    .login-btn {
+      width: 100%;
+      padding: 12px;
+      background: #6b3a2a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      font-family: inherit;
+      margin-top: 4px;
+      letter-spacing: 1px;
+    }
+    .login-btn:hover { background: #8b4a3a; }
+    .login-btn:disabled { background: #aaa; cursor: not-allowed; }
+    .login-error {
+      color: #cc4444;
+      font-size: 12px;
+      text-align: center;
+      margin-top: 10px;
+      min-height: 18px;
+    }
+
+    /* ===== Main view ===== */
+    .main-tabs {
+      background: #fff;
+      border-bottom: 2px solid #e0d8d0;
+      display: flex;
+    }
+    .main-tab {
+      flex: 1;
+      padding: 11px;
+      background: none;
+      border: none;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      color: #888;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+    }
+    .main-tab.active { color: #6b3a2a; border-bottom-color: #6b3a2a; font-weight: bold; }
+    .main-tab:hover:not(.active) { color: #6b3a2a; }
+
+    .page { padding: 16px; max-width: 500px; margin: 0 auto; }
+
+    /* Role badges */
+    .role-kitsuke  { background: #d5edcc; color: #3a6e30; }
+    .role-biyou    { background: #ccd5ed; color: #304a6e; }
+    .role-katazuke { background: #ede8cc; color: #6e5c30; }
+    .role-mix      { background: #e4ccec; color: #5a2e6e; }
+
+    /* Staff info bar */
+    .staff-info {
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .staff-name-big  { font-size: 17px; font-weight: bold; }
+    .staff-role-badge {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      font-weight: bold;
+    }
+
+    /* Month selector */
+    .month-selector { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .month-sel-btn {
+      padding: 5px 10px;
+      border: 1px solid #c49a7a;
+      border-radius: 16px;
+      background: #fff;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      color: #666;
+    }
+    .month-sel-btn.active { background: #6b3a2a; color: #fff; border-color: #6b3a2a; }
+
+    /* Period info */
+    .period-info {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 10px;
+      padding: 6px 10px;
+      background: #fdf5ef;
+      border-left: 3px solid #c49a7a;
+      border-radius: 0 4px 4px 0;
+    }
+
+    /* Half label */
+    .half-label {
+      font-size: 11px;
+      font-weight: bold;
+      color: #6b3a2a;
+      margin: 10px 0 6px;
+    }
+
+    /* Calendar grid (request) */
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+      margin-bottom: 6px;
+    }
+    .cal-dow { text-align: center; font-size: 9px; color: #999; padding: 2px 0; font-weight: bold; }
+    .cal-dow.sat { color: #4466aa; }
+    .cal-dow.sun { color: #aa4444; }
+
+    .cal-cell {
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-size: 11px;
+      border: 2px solid transparent;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+      transition: all 0.12s;
+      user-select: none;
+    }
+    .cal-cell .day-num  { font-size: 12px; font-weight: bold; }
+    .cal-cell .day-mark { font-size: 9px; height: 12px; }
+
+    .cal-cell.sat { background: #edf2fb; }
+    .cal-cell.sun { background: #fbedef; }
+    .cal-cell.clickable { cursor: pointer; }
+    .cal-cell.clickable:hover:not(.batsu) { border-color: #c49a7a; }
+    .cal-cell.batsu { background: #f0e0e0; border-color: #cc6666; color: #cc4444; }
+    .cal-cell.batsu .day-mark { color: #cc4444; font-weight: bold; }
+
+    /* Shift view cells (read-only) */
+    .cal-cell.shift-work { background: #e8f5e3; border-color: #4a9a40; }
+    .cal-cell.shift-work .day-mark { color: #2a6a20; font-weight: bold; font-size: 10px; }
+    .cal-cell.shift-off  { background: #f5e3e3; }
+    .cal-cell.shift-off  .day-mark { color: #aa3333; font-weight: bold; }
+    .cal-cell.shift-time { background: #fffde8; border-color: #d4c000; }
+    .cal-cell.shift-time .day-mark { color: #7a6a00; font-size: 8px; }
+
+    /* Remaining info */
+    .remaining-info {
+      background: #fff;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 8px 0;
+      font-size: 11px;
+      color: #555;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .remaining-info strong { color: #6b3a2a; }
+
+    /* Submit button */
+    .submit-section { margin-top: 16px; }
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      background: #6b3a2a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      font-family: inherit;
+      letter-spacing: 2px;
+    }
+    .submit-btn:hover { background: #8b4a3a; }
+    .submit-btn:active { transform: scale(0.99); }
+    .last-submit { text-align: center; font-size: 10px; color: #999; margin-top: 6px; }
+
+    /* Submitted banner */
+    .submitted-banner {
+      background: #e8f5e9;
+      border: 1px solid #81c784;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #2e7d32;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Success box */
+    .success-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 30px 20px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .success-icon  { font-size: 48px; margin-bottom: 12px; }
+    .success-title { font-size: 18px; font-weight: bold; color: #6b3a2a; margin-bottom: 8px; }
+    .success-msg   { font-size: 12px; color: #666; margin-bottom: 20px; line-height: 1.6; }
+    .success-btn {
+      display: inline-block;
+      padding: 10px 24px;
+      background: #6b3a2a;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      margin: 4px;
+    }
+    .success-btn.secondary { background: #fff; color: #6b3a2a; border: 1px solid #c49a7a; }
+    .success-btn:hover { opacity: 0.85; }
+    .success-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Shift view */
+    .shift-summary {
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #555;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .shift-summary strong { color: #6b3a2a; font-size: 15px; }
+    .shift-unconfirmed {
+      background: #fff;
+      border-radius: 8px;
+      padding: 30px 20px;
+      text-align: center;
+      font-size: 13px;
+      color: #aaa;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loadingOverlay" class="loading-overlay">
+  <div class="spinner"></div>読み込み中...
+</div>
+
+<header>
+  <div class="header-title">スタッフ専用</div>
+  <div class="header-right" id="headerRight"></div>
+</header>
+
+<!-- Login screen -->
+<div id="loginScreen">
+  <div class="login-screen">
+    <div class="login-logo">あかり</div>
+    <div class="login-subtitle">スタッフ専用</div>
+    <div class="login-card">
+      <div class="login-card-title">ログイン</div>
+      <div class="login-field">
+        <label class="login-label">ログインID</label>
+        <input type="text" class="login-input" id="loginId" placeholder="ID" autocomplete="username" inputmode="text">
+      </div>
+      <div class="login-field">
+        <label class="login-label">パスワード</label>
+        <input type="password" class="login-input" id="loginPassword" placeholder="パスワード" autocomplete="current-password">
+      </div>
+      <button class="login-btn" id="loginBtn" onclick="doLogin()">ログイン</button>
+      <div class="login-error" id="loginError"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Main view (after login) -->
+<div id="mainView" hidden>
+  <div class="main-tabs">
+    <button class="main-tab active" id="tabReq"   onclick="showMainTab('req')">休み希望申請</button>
+    <button class="main-tab"        id="tabShift" onclick="showMainTab('shift')">シフト確認</button>
+  </div>
+
+  <!-- Shared: staff info + month tabs -->
+  <div class="page" style="padding-bottom:0">
+    <div class="staff-info">
+      <div>
+        <div class="staff-name-big" id="dispName"></div>
+        <span class="staff-role-badge" id="dispRoleBadge"></span>
+      </div>
+    </div>
+    <div class="month-selector" id="monthSelector"></div>
+  </div>
+
+  <!-- 休み希望申請 tab -->
+  <div id="secReq" class="page" style="padding-top:0">
+    <div id="reqView">
+      <div id="calendarArea"></div>
+      <div class="submit-section">
+        <button class="submit-btn" id="submitBtn" onclick="submitRequest()">送信する</button>
+        <div class="last-submit" id="lastSubmit"></div>
+      </div>
+    </div>
+    <!-- Success state -->
+    <div id="successView" hidden>
+      <div class="success-box">
+        <div class="success-icon">✅</div>
+        <div class="success-title">送信しました</div>
+        <div class="success-msg" id="successMsg"></div>
+        <button class="success-btn" id="continueBtn" onclick="continueMonth()">別の月を申請する</button>
+        <button class="success-btn secondary" onclick="doLogout()">ログアウト</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- シフト確認 tab -->
+  <div id="secShift" class="page" style="padding-top:0;display:none">
+    <div id="shiftViewArea"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Supabase
+// ============================================================
+
+const SUPABASE_URL  = 'https://mcwkbhnsxksmglbpqfwy.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_vcUFz_4sADz8pF5YEJfDyQ_5ANNQD2C';
+
+// ============================================================
+// Constants
+// ============================================================
+
+const ROLE_META = {
+  '着付':      { label: '着付担当',   cls: 'role-kitsuke'  },
+  '美容':      { label: '美容担当',   cls: 'role-biyou'    },
+  '片付':      { label: '片付け担当', cls: 'role-katazuke' },
+  '着付/片付': { label: '着付/片付け', cls: 'role-mix'     },
+};
+
+const MONTHS = [];
+for (let m = 3; m <= 12; m++) MONTHS.push({ year: 2026, month: m });
+MONTHS.push({ year: 2027, month: 1 });
+MONTHS.push({ year: 2027, month: 2 });
+
+// Supabase client (initialized after constants to avoid TDZ if URL is invalid)
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ============================================================
+// State
+// ============================================================
+
+let selectedStaff   = null;
+let currentMonthIdx = 0;
+let currentMainTab  = 'req';
+let currentRequests = {};   // { dateStr: '×' }
+let currentSubmittedAt = null;
+
+function getMonth() { return MONTHS[currentMonthIdx]; }
+
+// ============================================================
+// Loading helpers
+// ============================================================
+
+function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
+
+// ============================================================
+// Date helpers
+// ============================================================
+
+function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+
+function firstHalfDates(year, month) {
+  const py = month === 1 ? year - 1 : year;
+  const pm = month === 1 ? 12 : month - 1;
+  const dates = [];
+  for (let d = 26; d <= daysInMonth(py, pm); d++) dates.push(new Date(py, pm - 1, d));
+  for (let d = 1;  d <= 10;  d++) dates.push(new Date(year, month - 1, d));
+  return dates;
+}
+
+function secondHalfDates(year, month) {
+  const dates = [];
+  for (let d = 11; d <= 25; d++) dates.push(new Date(year, month - 1, d));
+  return dates;
+}
+
+function fmt(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function isSat(d) { return d.getDay() === 6; }
+function isSun(d) { return d.getDay() === 0; }
+function reiwaYear(y) { return y - 2018; }
+
+// ============================================================
+// Supabase data functions
+// ============================================================
+
+async function doLogin() {
+  const id  = document.getElementById('loginId').value.trim();
+  const pwd = document.getElementById('loginPassword').value;
+  const err = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+  err.textContent = '';
+
+  if (!id || !pwd) { err.textContent = 'IDとパスワードを入力してください'; return; }
+
+  btn.disabled = true;
+  showLoading();
+  try {
+    const { data, error } = await sb
+      .from('staff')
+      .select('name,role,days_per_week,days_katazuke')
+      .eq('login_id', id)
+      .eq('password', pwd);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      err.textContent = 'IDまたはパスワードが正しくありません';
+      document.getElementById('loginPassword').value = '';
+      return;
+    }
+
+    const row = data[0];
+    const staffObj = {
+      name:         row.name,
+      role:         row.role,
+      daysPerWeek:  row.days_per_week,
+      daysKatazuke: row.days_katazuke,
+    };
+
+    sessionStorage.setItem('loggedInStaff', JSON.stringify(staffObj));
+    enterMainView(staffObj);
+  } catch(e) {
+    err.textContent = '通信エラーが発生しました。再度お試しください。';
+    console.error('Login error:', e);
+  } finally {
+    btn.disabled = false;
+    hideLoading();
+  }
+}
+
+async function loadRequestsFromDB(year, month) {
+  const { data, error } = await sb
+    .from('requests')
+    .select('dates,submitted_at')
+    .eq('year', year)
+    .eq('month', month)
+    .eq('staff_name', selectedStaff.name)
+    .maybeSingle();
+  if (error) throw error;
+  return {
+    dates:        data?.dates        || {},
+    submitted_at: data?.submitted_at || null,
+  };
+}
+
+async function loadShiftFromDB(year, month) {
+  const { data, error } = await sb
+    .from('shifts')
+    .select('date_str,value')
+    .eq('year', year)
+    .eq('month', month)
+    .eq('staff_name', selectedStaff.name);
+  if (error) throw error;
+  const result = {};
+  (data || []).forEach(r => { result[r.date_str] = r.value; });
+  return result;
+}
+
+// ============================================================
+// Login / Logout
+// ============================================================
+
+function doLogout() {
+  sessionStorage.removeItem('loggedInStaff');
+  selectedStaff = null;
+  document.getElementById('loginScreen').hidden = false;
+  document.getElementById('mainView').hidden     = true;
+  document.getElementById('loginId').value       = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginError').textContent = '';
+  document.getElementById('headerRight').innerHTML  = '';
+}
+
+function enterMainView(staffObj) {
+  selectedStaff = staffObj;
+
+  const meta = ROLE_META[staffObj.role] || { label: staffObj.role, cls: '' };
+  document.getElementById('headerRight').innerHTML =
+    `<span class="header-name">${staffObj.name}</span>
+     <button class="logout-btn" onclick="doLogout()">ログアウト</button>`;
+
+  document.getElementById('dispName').textContent = staffObj.name;
+  const badge = document.getElementById('dispRoleBadge');
+  badge.textContent = meta.label;
+  badge.className   = `staff-role-badge ${meta.cls}`;
+
+  // Default to current period
+  const today = new Date();
+  let defaultIdx = 0;
+  for (let i = 0; i < MONTHS.length; i++) {
+    const { year, month } = MONTHS[i];
+    if (new Date(year, month - 1, 25) >= today) { defaultIdx = i; break; }
+  }
+  currentMonthIdx = defaultIdx;
+  currentMainTab  = 'req';
+
+  buildMonthTabs();
+
+  document.getElementById('loginScreen').hidden = true;
+  document.getElementById('mainView').hidden    = false;
+  document.getElementById('tabReq').classList.add('active');
+  document.getElementById('tabShift').classList.remove('active');
+  document.getElementById('secReq').style.display   = '';
+  document.getElementById('secShift').style.display = 'none';
+
+  loadAndRenderReq();
+}
+
+// ============================================================
+// Tab switching
+// ============================================================
+
+function showMainTab(tab) {
+  currentMainTab = tab;
+  document.getElementById('tabReq').classList.toggle('active',   tab === 'req');
+  document.getElementById('tabShift').classList.toggle('active', tab === 'shift');
+  document.getElementById('secReq').style.display   = tab === 'req'   ? '' : 'none';
+  document.getElementById('secShift').style.display = tab === 'shift' ? '' : 'none';
+  if (tab === 'shift') renderShiftView();
+}
+
+// ============================================================
+// Month tabs
+// ============================================================
+
+function buildMonthTabs() {
+  const container = document.getElementById('monthSelector');
+  container.innerHTML = '';
+  MONTHS.forEach(({ year, month }, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'month-sel-btn' + (idx === currentMonthIdx ? ' active' : '');
+    btn.textContent = `R${reiwaYear(year)} ${month}月`;
+    btn.onclick = () => {
+      currentMonthIdx = idx;
+      buildMonthTabs();
+      if (currentMainTab === 'req') loadAndRenderReq();
+      else renderShiftView();
+    };
+    container.appendChild(btn);
+  });
+}
+
+// ============================================================
+// 休み希望申請 tab
+// ============================================================
+
+async function loadAndRenderReq() {
+  const { year, month } = getMonth();
+  showLoading();
+  try {
+    const { dates, submitted_at } = await loadRequestsFromDB(year, month);
+    currentRequests    = dates;
+    currentSubmittedAt = submitted_at;
+    showReqView();
+    renderCalendar();
+  } catch(e) {
+    alert('申請データの読み込みに失敗しました。再読み込みしてください。');
+    console.error('loadAndRenderReq error:', e);
+  } finally {
+    hideLoading();
+  }
+}
+
+function showReqView() {
+  document.getElementById('reqView').hidden     = false;
+  document.getElementById('successView').hidden = true;
+}
+
+function renderCalendar() {
+  const { year, month } = getMonth();
+  const py = month === 1 ? year - 1 : year;
+  const pm = month === 1 ? 12 : month - 1;
+  const fh = firstHalfDates(year, month);
+  const sh = secondHalfDates(year, month);
+  const all = [...fh, ...sh];
+  const offCount = all.filter(d => currentRequests[fmt(d)] === '×').length;
+
+  let html = `<div class="period-info">
+    令和${reiwaYear(year)}年${month}月分　${py}年${pm}月26日〜${year}年${month}月25日（${all.length}日間）
+  </div>`;
+
+  if (currentSubmittedAt) {
+    html += `<div class="submitted-banner">✅ 申請済み（${currentSubmittedAt}）　再申請で上書きされます</div>`;
+  }
+
+  html += `<div class="remaining-info">
+    出勤できない日を押してください。現在 <strong>${offCount}日</strong> 休み希望中。
+  </div>`;
+
+  html += `<div class="half-label">▶ 前半（${pm}月26日〜${month}月10日）</div>`;
+  html += buildCalGrid(fh, true);
+  html += `<div class="half-label">▶ 後半（${month}月11日〜${month}月25日）</div>`;
+  html += buildCalGrid(sh, true);
+
+  document.getElementById('calendarArea').innerHTML = html;
+}
+
+function buildCalGrid(dates, clickable) {
+  if (!dates.length) return '';
+  const firstDow = dates[0].getDay();
+  let html = '<div class="cal-grid">';
+
+  ['日','月','火','水','木','金','土'].forEach((d, i) => {
+    const cls = i === 0 ? 'cal-dow sun' : i === 6 ? 'cal-dow sat' : 'cal-dow';
+    html += `<div class="${cls}">${d}</div>`;
+  });
+
+  for (let i = 0; i < firstDow; i++) html += '<div></div>';
+
+  dates.forEach(date => {
+    const ds    = fmt(date);
+    const isOff = currentRequests[ds] === '×';
+    const sat   = isSat(date) ? ' sat' : '';
+    const sun   = isSun(date) ? ' sun' : '';
+    const batsu = isOff ? ' batsu' : '';
+    const click = clickable ? ` clickable" onclick="toggleDay('${ds}')` : '';
+    html += `<div class="cal-cell${sat}${sun}${batsu}${click}">
+      <div class="day-num">${date.getDate()}</div>
+      <div class="day-mark">${isOff ? '×' : ''}</div>
+    </div>`;
+  });
+
+  html += '</div>';
+  return html;
+}
+
+function toggleDay(ds) {
+  if (!currentRequests) currentRequests = {};
+  if (currentRequests[ds] === '×') delete currentRequests[ds];
+  else currentRequests[ds] = '×';
+  renderCalendar();
+}
+
+async function submitRequest() {
+  const { year, month } = getMonth();
+  const now = new Date();
+  const ts  = `${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  document.getElementById('submitBtn').disabled = true;
+  showLoading();
+  try {
+    const { error } = await sb.from('requests').upsert({
+      year,
+      month,
+      staff_name:   selectedStaff.name,
+      dates:        currentRequests,
+      submitted_at: ts,
+    });
+    if (error) throw error;
+
+    currentSubmittedAt = ts;
+    const offDays = Object.keys(currentRequests).filter(k => currentRequests[k] === '×');
+    const py = month === 1 ? year - 1 : year;
+    const pm = month === 1 ? 12 : month - 1;
+
+    document.getElementById('successMsg').innerHTML =
+      `<b>${selectedStaff.name}</b> さんの休み希望を送信しました。<br>
+      対象：令和${reiwaYear(year)}年${month}月分（${py}/${pm}/26〜${year}/${month}/25）<br>
+      休み希望日数：<b>${offDays.length}日</b><br><br>
+      管理者がシフトを確認・作成します。`;
+
+    // Hide "別の月" button if at last month
+    const continueBtn = document.getElementById('continueBtn');
+    continueBtn.disabled = (currentMonthIdx >= MONTHS.length - 1);
+    continueBtn.style.display = continueBtn.disabled ? 'none' : '';
+
+    document.getElementById('reqView').hidden     = true;
+    document.getElementById('successView').hidden = false;
+  } catch(e) {
+    alert('送信に失敗しました。再度お試しください。');
+    console.error('submitRequest error:', e);
+  } finally {
+    document.getElementById('submitBtn').disabled = false;
+    hideLoading();
+  }
+}
+
+function continueMonth() {
+  if (currentMonthIdx < MONTHS.length - 1) {
+    currentMonthIdx++;
+    buildMonthTabs();
+  }
+  showReqView();
+  loadAndRenderReq();
+}
+
+// ============================================================
+// シフト確認 tab
+// ============================================================
+
+async function renderShiftView() {
+  const { year, month } = getMonth();
+  showLoading();
+  try {
+    const myShift = await loadShiftFromDB(year, month);
+
+    const fh  = firstHalfDates(year, month);
+    const sh  = secondHalfDates(year, month);
+    const all = [...fh, ...sh];
+    const py  = month === 1 ? year - 1 : year;
+    const pm  = month === 1 ? 12 : month - 1;
+
+    const workDays = all.filter(d => { const v = myShift[fmt(d)]; return v && v !== '×'; }).length;
+    const hasAny   = all.some(d => myShift[fmt(d)]);
+
+    if (!hasAny) {
+      document.getElementById('shiftViewArea').innerHTML =
+        `<div class="shift-unconfirmed">
+          令和${reiwaYear(year)}年${month}月のシフトはまだ確定していません。
+        </div>`;
+      return;
+    }
+
+    let html = `<div class="period-info">
+      令和${reiwaYear(year)}年${month}月分　${py}年${pm}月26日〜${year}年${month}月25日
+    </div>
+    <div class="shift-summary">出勤予定日数: <strong>${workDays}日</strong></div>`;
+
+    html += `<div class="half-label">▶ 前半（${pm}月26日〜${month}月10日）</div>`;
+    html += buildShiftGrid(fh, myShift);
+    html += `<div class="half-label">▶ 後半（${month}月11日〜${month}月25日）</div>`;
+    html += buildShiftGrid(sh, myShift);
+
+    document.getElementById('shiftViewArea').innerHTML = html;
+  } catch(e) {
+    document.getElementById('shiftViewArea').innerHTML =
+      '<div class="shift-unconfirmed">データの読み込みに失敗しました。</div>';
+    console.error('renderShiftView error:', e);
+  } finally {
+    hideLoading();
+  }
+}
+
+function buildShiftGrid(dates, myShift) {
+  if (!dates.length) return '';
+  const firstDow = dates[0].getDay();
+  let html = '<div class="cal-grid">';
+
+  ['日','月','火','水','木','金','土'].forEach((d, i) => {
+    const cls = i === 0 ? 'cal-dow sun' : i === 6 ? 'cal-dow sat' : 'cal-dow';
+    html += `<div class="${cls}">${d}</div>`;
+  });
+
+  for (let i = 0; i < firstDow; i++) html += '<div></div>';
+
+  dates.forEach(date => {
+    const ds  = fmt(date);
+    const val = myShift[ds] || '';
+    const sat = isSat(date) ? ' sat' : '';
+    const sun = isSun(date) ? ' sun' : '';
+    let extra = '';
+    let mark  = '';
+    if (val === '○') { extra = ' shift-work'; mark = '○'; }
+    else if (val === '×') { extra = ' shift-off';  mark = '×'; }
+    else if (val) { extra = ' shift-time'; mark = val; }
+    html += `<div class="cal-cell${sat}${sun}${extra}" style="cursor:default">
+      <div class="day-num">${date.getDate()}</div>
+      <div class="day-mark">${mark}</div>
+    </div>`;
+  });
+
+  html += '</div>';
+  return html;
+}
+
+// ============================================================
+// Init
+// ============================================================
+
+document.getElementById('loginPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+window.addEventListener('load', () => {
+  hideLoading();
+  const savedStr = sessionStorage.getItem('loggedInStaff');
+  if (savedStr) {
+    try {
+      const staffObj = JSON.parse(savedStr);
+      if (staffObj && staffObj.name) {
+        enterMainView(staffObj);
+        return;
+      }
+    } catch(e) { /* invalid JSON */ }
+    sessionStorage.removeItem('loggedInStaff');
+  }
+  // Show login screen (visible by default)
+});
+</script>
+</body>
+</html>

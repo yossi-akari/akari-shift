@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>シフト管理 | 管理者用</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', 'Yu Gothic', sans-serif;
+      background: #f0ece6;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255,255,255,0.75);
+      z-index: 9000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: #6b3a2a;
+      pointer-events: all;
+    }
+    .loading-overlay.hidden { display: none; }
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid #e0d0c8;
+      border-top-color: #6b3a2a;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    header {
+      background: #3a2a1a;
+      color: #fff;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-title { font-size: 15px; font-weight: bold; flex: 1; }
+    .header-link {
+      font-size: 11px;
+      color: #ffccaa;
+      text-decoration: none;
+      border: 1px solid #ffccaa;
+      padding: 3px 8px;
+      border-radius: 10px;
+    }
+    .header-link:hover { background: rgba(255,255,255,0.1); }
+
+    .month-tabs-wrap {
+      background: #2a1a0a;
+      padding: 0 12px;
+      overflow-x: auto;
+    }
+    .month-tabs { display: flex; min-width: max-content; }
+    .month-tab {
+      padding: 8px 12px;
+      background: none;
+      border: none;
+      color: #aa8866;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+    }
+    .month-tab:hover { color: #ffccaa; }
+    .month-tab.active { color: #fff; border-bottom-color: #c49a7a; }
+
+    .section-tabs {
+      background: #fff;
+      border-bottom: 1px solid #ddd;
+      padding: 0 16px;
+      display: flex;
+    }
+    .section-tab {
+      padding: 10px 16px;
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      border-bottom: 3px solid transparent;
+    }
+    .section-tab.active { color: #6b3a2a; border-bottom-color: #6b3a2a; font-weight: bold; }
+    .section-tab:hover { color: #6b3a2a; }
+
+    .main { padding: 16px; }
+
+    .section-content { display: none; }
+    .section-content.active { display: block; }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .toolbar-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid #c49a7a;
+      background: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      color: #6b3a2a;
+    }
+    .toolbar-btn:hover { background: #fdf0e8; }
+    .toolbar-btn.primary { background: #6b3a2a; color: #fff; border-color: #6b3a2a; }
+    .toolbar-btn.primary:hover { background: #8b4a3a; }
+    .toolbar-btn.danger { color: #c0392b; border-color: #e74c3c; }
+    .toolbar-btn.danger:hover { background: #fdf0f0; }
+
+    .mode-toggle {
+      display: flex;
+      border: 1px solid #c49a7a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .mode-btn {
+      padding: 5px 10px;
+      background: #fff;
+      border: none;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      color: #888;
+    }
+    .mode-btn.active { background: #6b3a2a; color: #fff; }
+
+    .period-info {
+      font-size: 11px;
+      color: #666;
+      padding: 6px 10px;
+      background: #fdf5ef;
+      border-left: 3px solid #c49a7a;
+      border-radius: 0 4px 4px 0;
+      margin-bottom: 12px;
+    }
+
+    .half-label {
+      font-size: 12px;
+      font-weight: bold;
+      color: #6b3a2a;
+      margin: 14px 0 6px;
+    }
+
+    /* Shift table */
+    .table-wrap {
+      overflow-x: auto;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .shift-table {
+      border-collapse: collapse;
+      font-size: 11px;
+      min-width: 100%;
+    }
+    .shift-table th, .shift-table td {
+      border: 1px solid #e0d8d0;
+      padding: 0;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .name-col {
+      min-width: 52px;
+      max-width: 52px;
+      position: sticky;
+      left: 0;
+      background: #fff;
+      z-index: 2;
+      padding: 4px 6px;
+      font-weight: bold;
+      font-size: 11px;
+      text-align: left;
+    }
+    .date-th {
+      min-width: 34px;
+      max-width: 34px;
+      padding: 3px 2px;
+      background: #fafaf8;
+      line-height: 1.4;
+    }
+    .date-th.sat { background: #edf2fb; color: #4466aa; }
+    .date-th.sun { background: #fbedef; color: #aa4444; }
+    .date-th .date-num { font-size: 11px; font-weight: bold; }
+    .date-th .date-dow { font-size: 9px; }
+
+    .role-header-row td {
+      padding: 4px 8px;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-align: left;
+    }
+    .rh-kitsuke  { background: #e8f5e3; color: #3a6e30; }
+    .rh-biyou    { background: #e3e8f5; color: #30406e; }
+    .rh-katazuke { background: #f5f0e3; color: #6e5830; }
+    .rh-mix      { background: #f0e3f5; color: #5a2e6e; }
+
+    .kitsuke-name  { background: #f4faf2 !important; }
+    .biyou-name    { background: #f2f4fa !important; }
+    .katazuke-name { background: #faf8f2 !important; }
+    .mix-name      { background: #f8f2fa !important; }
+
+    .shift-cell {
+      cursor: pointer;
+      min-width: 34px;
+      height: 30px;
+      position: relative;
+      font-size: 11px;
+    }
+    .shift-cell:hover { background: #fdf8f4 !important; }
+    .shift-cell.val-maru { background: #e8f5e3; color: #2a6a20; font-weight: bold; }
+    .shift-cell.val-batsu { background: #f5e3e3; color: #aa3333; font-weight: bold; }
+    .shift-cell.val-time { background: #fffde8; color: #7a6a00; font-size: 9px; }
+    .shift-cell.req-off:not(.val-maru):not(.val-batsu):not(.val-time) { background: #fef2f2; }
+    .req-dot {
+      position: absolute;
+      top: 1px;
+      right: 2px;
+      font-size: 7px;
+      color: #cc4444;
+      pointer-events: none;
+    }
+
+    /* Role badges */
+    .role-kitsuke  { background: #d5edcc; color: #3a6e30; }
+    .role-biyou    { background: #ccd5ed; color: #304a6e; }
+    .role-katazuke { background: #ede8cc; color: #6e5c30; }
+    .role-mix      { background: #e4ccec; color: #5a2e6e; }
+
+    /* Cell popup */
+    #cellPopup {
+      position: fixed;
+      background: #fff;
+      border: 1px solid #c49a7a;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      padding: 8px;
+      z-index: 1000;
+      display: none;
+      min-width: 160px;
+    }
+    .popup-title {
+      font-size: 10px;
+      color: #888;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #eee;
+    }
+    .popup-options { display: flex; gap: 4px; margin-bottom: 6px; }
+    .popup-opt {
+      padding: 5px 10px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      background: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .popup-opt.maru  { border-color: #4a9a40; color: #2a6a20; background: #e8f5e3; }
+    .popup-opt.batsu { border-color: #aa4444; color: #aa3333; background: #f5e3e3; }
+    .popup-opt.clear { color: #888; }
+    .popup-time-row { display: flex; gap: 4px; align-items: center; }
+    .popup-time-input {
+      width: 64px;
+      padding: 4px 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: inherit;
+    }
+    .popup-time-input.invalid { border-color: #e74c3c; }
+    .popup-time-btn {
+      padding: 4px 8px;
+      background: #f0e8dc;
+      border: 1px solid #c49a7a;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    /* Requests table */
+    .req-table-wrap {
+      overflow-x: auto;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .req-table {
+      border-collapse: collapse;
+      font-size: 11px;
+      min-width: 100%;
+    }
+    .req-table th, .req-table td {
+      border: 1px solid #e0d8d0;
+      padding: 3px;
+      text-align: center;
+    }
+    .req-table .sticky-name {
+      font-weight: bold;
+      text-align: left;
+      padding-left: 8px;
+      min-width: 52px;
+      position: sticky;
+      left: 0;
+      background: #fff;
+      z-index: 1;
+    }
+    .req-off-cell { background: #f5e3e3; color: #aa3333; font-weight: bold; }
+    .ts-cell { font-size: 9px; color: #888; white-space: nowrap; }
+
+    /* Settings */
+    .settings-section { max-width: 640px; }
+    .settings-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+    .settings-table th {
+      background: #f5f0ea;
+      font-size: 11px;
+      padding: 8px;
+      border-bottom: 1px solid #e0d8d0;
+    }
+    .settings-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #f0ece6;
+      font-size: 12px;
+    }
+    .settings-table tr:last-child td { border-bottom: none; }
+    .settings-input {
+      width: 50px;
+      padding: 3px 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: inherit;
+      text-align: center;
+    }
+    .settings-role-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: bold;
+    }
+    .btn-remove {
+      padding: 3px 8px;
+      background: none;
+      border: 1px solid #e74c3c;
+      border-radius: 4px;
+      color: #c0392b;
+      font-size: 10px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-remove:hover { background: #fdf0f0; }
+
+    .btn-auth {
+      padding: 3px 8px;
+      background: none;
+      border: 1px solid #c49a7a;
+      border-radius: 4px;
+      color: #6b3a2a;
+      font-size: 10px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-auth:hover { background: #fdf0e8; }
+    .cred-set   { color: #2e7d32; font-size: 10px; }
+    .cred-unset { color: #aaa;    font-size: 10px; }
+
+    #credModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #credModal.open { display: flex; }
+    .cred-box {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      width: 320px;
+      max-width: 92%;
+    }
+    .cred-title { font-size: 14px; font-weight: bold; color: #6b3a2a; margin-bottom: 14px; }
+    .cred-field { margin-bottom: 10px; }
+    .cred-label { font-size: 11px; color: #888; margin-bottom: 3px; display: block; }
+    .cred-input {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .cred-input:focus { outline: none; border-color: #c49a7a; }
+    .cred-error { font-size: 11px; color: #cc4444; margin-top: 4px; min-height: 16px; }
+
+    .add-staff-form {
+      background: #fff;
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+    .add-staff-form h3 { font-size: 13px; margin-bottom: 10px; color: #6b3a2a; }
+    .form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .form-label { font-size: 11px; color: #888; }
+    .form-input {
+      padding: 5px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: inherit;
+    }
+    .form-select {
+      padding: 5px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: inherit;
+      background: #fff;
+    }
+
+    /* Notes */
+    .notes-section { margin-top: 16px; }
+    .notes-label { font-size: 12px; font-weight: bold; color: #6b3a2a; margin-bottom: 6px; }
+    .notes-textarea {
+      width: 100%;
+      max-width: 700px;
+      min-height: 72px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: inherit;
+      resize: vertical;
+    }
+
+    /* Preview modal */
+    #previewModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #previewModal.open { display: flex; }
+    .modal-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 620px;
+      width: 92%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-title { font-size: 15px; font-weight: bold; color: #6b3a2a; margin-bottom: 12px; }
+    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    .btn-cancel {
+      padding: 8px 16px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      color: #666;
+    }
+    .btn-apply {
+      padding: 8px 20px;
+      background: #6b3a2a;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-apply:hover { background: #8b4a3a; }
+    .preview-staff-row {
+      padding: 5px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 12px;
+    }
+    .preview-staff-row strong { color: #6b3a2a; }
+    .preview-days { color: #666; font-size: 10px; margin-top: 2px; line-height: 1.5; }
+    .preview-role-hdr {
+      font-size: 11px;
+      font-weight: bold;
+      color: #6b3a2a;
+      margin: 10px 0 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .pairing-stat {
+      background: #f0f8ee;
+      border: 1px solid #b0d8a8;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 11px;
+      margin-bottom: 12px;
+      color: #3a6a30;
+    }
+
+    #importInput { display: none; }
+    .empty-msg { font-size: 12px; color: #999; padding: 20px; text-align: center; }
+
+    /* Save indicator */
+    .save-indicator {
+      font-size: 10px;
+      color: #4a9a40;
+      margin-left: 4px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .save-indicator.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loadingOverlay" class="loading-overlay hidden">
+  <div class="spinner"></div>処理中...
+</div>
+
+<header>
+  <div class="header-title">シフト管理　管理者用</div>
+  <a href="staff.html" class="header-link">スタッフページ →</a>
+</header>
+
+<div class="month-tabs-wrap">
+  <div class="month-tabs" id="monthTabs"></div>
+</div>
+
+<div class="section-tabs">
+  <button class="section-tab active" onclick="showSection('shift')">シフト表</button>
+  <button class="section-tab" onclick="showSection('requests')">希望一覧</button>
+  <button class="section-tab" onclick="showSection('settings')">スタッフ設定</button>
+</div>
+
+<div class="main">
+
+  <!-- シフト表 -->
+  <div id="sec-shift" class="section-content active">
+    <div class="toolbar">
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="modeKeep" onclick="setMode('keep')">休み希望を保持</button>
+        <button class="mode-btn" id="modeReset" onclick="setMode('reset')">全リセット</button>
+      </div>
+      <button class="toolbar-btn primary" onclick="previewAlloc()">自動割り振り</button>
+      <button class="toolbar-btn danger" onclick="resetShift()">シフトをリセット</button>
+      <button class="toolbar-btn" onclick="exportData()">エクスポート</button>
+      <label class="toolbar-btn" style="cursor:pointer">
+        インポート
+        <input type="file" id="importInput" accept=".json" onchange="importData(event)">
+      </label>
+    </div>
+
+    <div class="period-info" id="periodInfo"></div>
+
+    <div class="half-label" id="lblFirst">▶ 前半</div>
+    <div class="table-wrap" id="firstHalfWrap"></div>
+
+    <div class="half-label" id="lblSecond" style="margin-top:16px">▶ 後半</div>
+    <div class="table-wrap" id="secondHalfWrap"></div>
+
+    <div class="notes-section">
+      <div class="notes-label">メモ <span class="save-indicator" id="notesSaved">保存済み</span></div>
+      <textarea class="notes-textarea" id="notesArea" placeholder="この月のメモ..." oninput="debounceSaveNotes()"></textarea>
+    </div>
+  </div>
+
+  <!-- 希望一覧 -->
+  <div id="sec-requests" class="section-content">
+    <div id="requestsContent"></div>
+  </div>
+
+  <!-- スタッフ設定 -->
+  <div id="sec-settings" class="section-content">
+    <div class="settings-section">
+      <table class="settings-table">
+        <thead>
+          <tr>
+            <th>名前</th>
+            <th>役割</th>
+            <th>週出勤日数</th>
+            <th>週片付け日数</th>
+            <th>ログインID</th>
+            <th>認証</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="settingsBody"></tbody>
+      </table>
+
+      <div class="add-staff-form">
+        <h3>スタッフ追加</h3>
+        <div class="form-row">
+          <span class="form-label">名前</span>
+          <input type="text" class="form-input" id="newName" placeholder="例：田中" style="width:80px">
+          <span class="form-label">役割</span>
+          <select class="form-select" id="newRole" onchange="toggleKatazukeField()">
+            <option value="着付">着付担当</option>
+            <option value="美容">美容担当</option>
+            <option value="片付">片付け担当</option>
+            <option value="着付/片付">着付/片付け</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <span class="form-label">週出勤日数</span>
+          <input type="number" class="form-input" id="newDays" value="3" min="0" max="7" style="width:55px">
+          <span class="form-label" id="lblKatazuke" style="display:none">週片付け日数</span>
+          <input type="number" class="form-input" id="newKatazukeDays" value="2" min="0" max="7" style="width:55px;display:none">
+        </div>
+        <button class="toolbar-btn primary" onclick="addStaff()">追加</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Cell popup -->
+<div id="cellPopup">
+  <div class="popup-title" id="popupTitle"></div>
+  <div class="popup-options">
+    <button class="popup-opt maru"  onclick="applyCell('○')">○</button>
+    <button class="popup-opt batsu" onclick="applyCell('×')">×</button>
+    <button class="popup-opt clear" onclick="applyCell('')">クリア</button>
+  </div>
+  <div class="popup-time-row">
+    <input type="text" class="popup-time-input" id="timeInput" placeholder="14-18">
+    <button class="popup-time-btn" onclick="applyTimeCell()">時間設定</button>
+  </div>
+</div>
+
+<!-- Preview modal -->
+<div id="previewModal">
+  <div class="modal-box">
+    <div class="modal-title">自動割り振りプレビュー</div>
+    <div id="previewBody"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closePreview()">キャンセル</button>
+      <button class="btn-apply" id="applyAllocBtn" onclick="applyAlloc()">適用する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Credential modal -->
+<div id="credModal">
+  <div class="cred-box">
+    <div class="cred-title" id="credTitle">認証設定</div>
+    <div class="cred-field">
+      <label class="cred-label">ログインID</label>
+      <input type="text" class="cred-input" id="credId" placeholder="例：murata01" autocomplete="off">
+    </div>
+    <div class="cred-field">
+      <label class="cred-label">パスワード</label>
+      <input type="password" class="cred-input" id="credPw" placeholder="パスワードを入力" autocomplete="new-password">
+    </div>
+    <div class="cred-field">
+      <label class="cred-label">パスワード確認</label>
+      <input type="password" class="cred-input" id="credPw2" placeholder="もう一度入力" autocomplete="new-password">
+    </div>
+    <div class="cred-error" id="credError"></div>
+    <div class="modal-footer" style="margin-top:12px">
+      <button class="btn-cancel" onclick="closeCredModal()">キャンセル</button>
+      <button class="btn-apply" id="credSaveBtn" onclick="saveCredential()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Supabase
+// ============================================================
+
+const SUPABASE_URL  = 'https://mcwkbhnsxksmglbpqfwy.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_vcUFz_4sADz8pF5YEJfDyQ_5ANNQD2C';
+
+// ============================================================
+// Constants
+// ============================================================
+
+const ROLE_META = {
+  '着付':      { label: '着付担当',   cls: 'role-kitsuke',  rhCls: 'rh-kitsuke',  nameCls: 'kitsuke-name'  },
+  '美容':      { label: '美容担当',   cls: 'role-biyou',    rhCls: 'rh-biyou',    nameCls: 'biyou-name'    },
+  '片付':      { label: '片付け担当', cls: 'role-katazuke', rhCls: 'rh-katazuke', nameCls: 'katazuke-name' },
+  '着付/片付': { label: '着付/片付け', cls: 'role-mix',      rhCls: 'rh-mix',      nameCls: 'mix-name'      },
+};
+
+const ROLE_ORDER = ['着付', '美容', '片付', '着付/片付'];
+
+const MONTHS = [];
+for (let m = 3; m <= 12; m++) MONTHS.push({ year: 2026, month: m });
+MONTHS.push({ year: 2027, month: 1 });
+MONTHS.push({ year: 2027, month: 2 });
+
+const DOW_JP = ['日','月','火','水','木','金','土'];
+
+// Supabase client (initialized after constants to avoid TDZ if URL is invalid)
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ============================================================
+// State
+// ============================================================
+
+let currentMonthIdx = 0;
+let currentSection  = 'shift';
+let shiftData       = {};     // { staffName: { dateStr: val } }
+let requestsData    = {};     // { staffName: { dateStr: '×' } }
+let timestampsData  = {};     // { staffName: 'M/D HH:MM' }
+let staffData       = [];     // [{ name, role, daysPerWeek, daysKatazuke }]
+let pendingAlloc    = null;
+let allocMode       = 'keep';
+let activeCell      = null;
+let credModalTarget = null;
+let notesSaveTimer  = null;
+
+// ============================================================
+// Loading helpers
+// ============================================================
+
+function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
+
+// ============================================================
+// Date helpers
+// ============================================================
+
+function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+
+function firstHalfDates(year, month) {
+  const py = month === 1 ? year - 1 : year;
+  const pm = month === 1 ? 12 : month - 1;
+  const max = daysInMonth(py, pm);
+  const dates = [];
+  for (let d = 26; d <= max; d++) dates.push(new Date(py, pm - 1, d));
+  for (let d = 1;  d <= 10;  d++) dates.push(new Date(year, month - 1, d));
+  return dates;
+}
+
+function secondHalfDates(year, month) {
+  const dates = [];
+  for (let d = 11; d <= 25; d++) dates.push(new Date(year, month - 1, d));
+  return dates;
+}
+
+function fmt(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function isSat(d) { return d.getDay() === 6; }
+function isSun(d) { return d.getDay() === 0; }
+function reiwaYear(y) { return y - 2018; }
+
+// ============================================================
+// Supabase data functions
+// ============================================================
+
+async function dbLoadShift(year, month) {
+  const { data, error } = await sb
+    .from('shifts')
+    .select('staff_name,date_str,value')
+    .eq('year', year)
+    .eq('month', month);
+  if (error) throw error;
+  const result = {};
+  (data || []).forEach(r => {
+    if (!result[r.staff_name]) result[r.staff_name] = {};
+    result[r.staff_name][r.date_str] = r.value;
+  });
+  return result;
+}
+
+async function dbLoadRequests(year, month) {
+  const { data, error } = await sb
+    .from('requests')
+    .select('staff_name,dates,submitted_at')
+    .eq('year', year)
+    .eq('month', month);
+  if (error) throw error;
+  const requests   = {};
+  const timestamps = {};
+  (data || []).forEach(r => {
+    requests[r.staff_name]   = r.dates        || {};
+    timestamps[r.staff_name] = r.submitted_at || '';
+  });
+  return { requests, timestamps };
+}
+
+async function dbLoadStaff() {
+  const { data, error } = await sb.from('staff').select('*').order('sort_order');
+  if (error) throw error;
+  return data || [];
+}
+
+async function dbLoadNotes(year, month) {
+  const { data, error } = await sb
+    .from('notes')
+    .select('content')
+    .eq('year', year)
+    .eq('month', month)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.content || '';
+}
+
+async function dbSaveNotes(year, month, content) {
+  const { error } = await sb.from('notes').upsert({ year, month, content });
+  if (error) throw error;
+}
+
+// ============================================================
+// Month tabs
+// ============================================================
+
+function buildMonthTabs() {
+  const container = document.getElementById('monthTabs');
+  container.innerHTML = '';
+  MONTHS.forEach(({ year, month }, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'month-tab' + (idx === currentMonthIdx ? ' active' : '');
+    btn.textContent = `R${reiwaYear(year)} ${month}月`;
+    btn.onclick = () => { currentMonthIdx = idx; buildMonthTabs(); loadAndRender(); };
+    container.appendChild(btn);
+  });
+}
+
+// ============================================================
+// Section switching
+// ============================================================
+
+function showSection(name) {
+  currentSection = name;
+  document.querySelectorAll('.section-tab').forEach((tab, i) => {
+    tab.classList.toggle('active', ['shift','requests','settings'][i] === name);
+  });
+  document.querySelectorAll('.section-content').forEach(el => {
+    el.classList.toggle('active', el.id === 'sec-' + name);
+  });
+  hideCellPopup();
+  if (name === 'requests') renderRequestsTable();
+  if (name === 'settings') renderSettings();
+}
+
+// ============================================================
+// Load & render (master)
+// ============================================================
+
+async function loadAndRender() {
+  const { year, month } = MONTHS[currentMonthIdx];
+  showLoading();
+  try {
+    const [shiftResult, { requests, timestamps }, staffRows, notes] = await Promise.all([
+      dbLoadShift(year, month),
+      dbLoadRequests(year, month),
+      dbLoadStaff(),
+      dbLoadNotes(year, month),
+    ]);
+    shiftData      = shiftResult;
+    requestsData   = requests;
+    timestampsData = timestamps;
+    staffData      = staffRows.map(r => ({
+      name:         r.name,
+      role:         r.role,
+      daysPerWeek:  r.days_per_week,
+      daysKatazuke: r.days_katazuke,
+    }));
+
+    renderPeriodInfo();
+    renderShiftTable();
+    document.getElementById('notesArea').value = notes;
+    hideCellPopup();
+
+    if (currentSection === 'requests') renderRequestsTable();
+    if (currentSection === 'settings') renderSettings();
+  } catch(e) {
+    alert('データの読み込みに失敗しました。再読み込みしてください。');
+    console.error('loadAndRender error:', e);
+  } finally {
+    hideLoading();
+  }
+}
+
+function renderPeriodInfo() {
+  const { year, month } = MONTHS[currentMonthIdx];
+  const py = month === 1 ? year - 1 : year;
+  const pm = month === 1 ? 12 : month - 1;
+  const fh = firstHalfDates(year, month);
+  const sh = secondHalfDates(year, month);
+  const total = fh.length + sh.length;
+  document.getElementById('periodInfo').textContent =
+    `令和${reiwaYear(year)}年${month}月分　${py}年${pm}月26日〜${year}年${month}月25日（${total}日間）`;
+  document.getElementById('lblFirst').textContent  = `▶ 前半（${pm}月26日〜${month}月10日）`;
+  document.getElementById('lblSecond').textContent = `▶ 後半（${month}月11日〜${month}月25日）`;
+}
+
+// ============================================================
+// Shift table rendering
+// ============================================================
+
+function renderShiftTable() {
+  const { year, month } = MONTHS[currentMonthIdx];
+  document.getElementById('firstHalfWrap').innerHTML =
+    buildHalfTable(firstHalfDates(year, month), staffData, requestsData);
+  document.getElementById('secondHalfWrap').innerHTML =
+    buildHalfTable(secondHalfDates(year, month), staffData, requestsData);
+}
+
+function buildHalfTable(dates, staff, requests) {
+  if (!dates.length) return '';
+
+  let html = '<table class="shift-table"><thead><tr>';
+  html += '<th class="name-col" style="background:#fafaf8">スタッフ</th>';
+  dates.forEach(d => {
+    const cls = isSat(d) ? ' sat' : isSun(d) ? ' sun' : '';
+    html += `<th class="date-th${cls}">
+      <div class="date-num">${d.getDate()}</div>
+      <div class="date-dow">${DOW_JP[d.getDay()]}</div>
+    </th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  ROLE_ORDER.forEach(role => {
+    const roleStaff = staff.filter(s => s.role === role);
+    if (!roleStaff.length) return;
+    const meta = ROLE_META[role];
+
+    html += `<tr class="role-header-row">
+      <td colspan="${dates.length + 1}" class="${meta.rhCls}">${meta.label}</td>
+    </tr>`;
+
+    roleStaff.forEach(s => {
+      const sReqs = requests[s.name] || {};
+      html += `<tr class="staff-row" data-staff="${s.name}">`;
+      html += `<td class="name-col ${meta.nameCls}">${s.name}</td>`;
+      dates.forEach(d => {
+        const ds     = fmt(d);
+        const val    = (shiftData[s.name] && shiftData[s.name][ds]) || '';
+        const reqOff = sReqs[ds] === '×';
+        let cls = 'shift-cell';
+        if (val === '○') cls += ' val-maru';
+        else if (val === '×') cls += ' val-batsu';
+        else if (val) cls += ' val-time';
+        if (reqOff) cls += ' req-off';
+        const dot = reqOff ? '<span class="req-dot">✕</span>' : '';
+        // XSS prevention: escape val before inserting
+        const safeVal = escHtml(val);
+        html += `<td class="${cls}" data-date="${ds}" onclick="cellClick(this)">${dot}${safeVal}</td>`;
+      });
+      html += '</tr>';
+    });
+  });
+
+  html += '</tbody></table>';
+  return html;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ============================================================
+// Cell editing
+// ============================================================
+
+function cellClick(el) {
+  const staff = el.closest('tr').dataset.staff;
+  const date  = el.dataset.date;
+  const curVal = (shiftData[staff] && shiftData[staff][date]) || '';
+  activeCell = { el, staff, date };
+
+  document.getElementById('popupTitle').textContent = `${staff}　${date}`;
+  const timeInput = document.getElementById('timeInput');
+  timeInput.value = /^\d/.test(curVal) ? curVal : '';
+  timeInput.classList.remove('invalid');
+
+  const popup = document.getElementById('cellPopup');
+  const rect  = el.getBoundingClientRect();
+  const pw = 170, ph = 95;
+  let left = rect.left;
+  let top  = rect.bottom + 4;
+  if (left + pw > window.innerWidth)  left = window.innerWidth  - pw - 8;
+  if (top  + ph > window.innerHeight) top  = rect.top - ph - 4;
+  if (left < 0) left = 4;
+  popup.style.left    = left + 'px';
+  popup.style.top     = top  + 'px';
+  popup.style.display = 'block';
+}
+
+function hideCellPopup() {
+  document.getElementById('cellPopup').style.display = 'none';
+  activeCell = null;
+}
+
+async function applyCell(val) {
+  if (!activeCell) return;
+  const { el, staff, date } = activeCell;
+  const { year, month } = MONTHS[currentMonthIdx];
+
+  hideCellPopup();
+  showLoading();
+  try {
+    if (val === '') {
+      const { error } = await sb.from('shifts').delete()
+        .eq('year', year).eq('month', month)
+        .eq('staff_name', staff).eq('date_str', date);
+      if (error) throw error;
+      if (shiftData[staff]) {
+        delete shiftData[staff][date];
+        if (!Object.keys(shiftData[staff]).length) delete shiftData[staff];
+      }
+    } else {
+      const { error } = await sb.from('shifts').upsert(
+        { year, month, staff_name: staff, date_str: date, value: val }
+      );
+      if (error) throw error;
+      if (!shiftData[staff]) shiftData[staff] = {};
+      shiftData[staff][date] = val;
+    }
+    updateCellEl(el, val);
+  } catch(e) {
+    alert('保存に失敗しました');
+    console.error('applyCell error:', e);
+  } finally {
+    hideLoading();
+  }
+}
+
+function applyTimeCell() {
+  const timeInput = document.getElementById('timeInput');
+  const t = timeInput.value.trim();
+  if (!t) return;
+  // Validate format: digits-digits (e.g. 14-18, 9-17)
+  if (!/^\d{1,2}-\d{1,2}$/.test(t)) {
+    timeInput.classList.add('invalid');
+    return;
+  }
+  timeInput.classList.remove('invalid');
+  applyCell(t);
+}
+
+function updateCellEl(el, val) {
+  // Preserve req-off class, remove only val-* classes
+  el.className = el.className.replace(/\bval-\S+/g, '').trim();
+  if (val === '○') el.classList.add('val-maru');
+  else if (val === '×') el.classList.add('val-batsu');
+  else if (val) el.classList.add('val-time');
+
+  // Use textContent (safe) + req-dot span preserved via template
+  const reqOff = el.classList.contains('req-off');
+  // Clear and rebuild safely
+  el.textContent = '';
+  if (reqOff) {
+    const dot = document.createElement('span');
+    dot.className = 'req-dot';
+    dot.textContent = '✕';
+    el.appendChild(dot);
+  }
+  if (val) el.appendChild(document.createTextNode(val));
+}
+
+document.addEventListener('click', e => {
+  const popup = document.getElementById('cellPopup');
+  if (popup.style.display !== 'none' &&
+      !popup.contains(e.target) &&
+      !e.target.closest('.shift-cell')) {
+    hideCellPopup();
+  }
+});
+
+// ============================================================
+// Reset
+// ============================================================
+
+async function resetShift() {
+  if (!confirm('このシフトをすべてリセットしますか？')) return;
+  const { year, month } = MONTHS[currentMonthIdx];
+  showLoading();
+  try {
+    const { error } = await sb.from('shifts').delete()
+      .eq('year', year).eq('month', month);
+    if (error) throw error;
+    shiftData = {};
+    renderShiftTable();
+  } catch(e) {
+    alert('リセットに失敗しました');
+    console.error('resetShift error:', e);
+  } finally {
+    hideLoading();
+  }
+}
+
+// ============================================================
+// Auto-allocation
+// ============================================================
+
+function setMode(mode) {
+  allocMode = mode;
+  document.getElementById('modeKeep').classList.toggle('active', mode === 'keep');
+  document.getElementById('modeReset').classList.toggle('active', mode === 'reset');
+}
+
+// Bug fix A: selectEvenly never returns duplicates
+function selectEvenly(pool, n) {
+  if (n <= 0 || !pool.length) return [];
+  if (pool.length <= n) return [...pool];
+  const result = [];
+  const used   = new Set();
+  const step   = pool.length / n;
+  for (let i = 0; i < n; i++) {
+    let idx = Math.floor(i * step);
+    // If this index was already used, find the next unused one
+    while (used.has(idx) && idx < pool.length) idx++;
+    if (idx >= pool.length) break;
+    used.add(idx);
+    result.push(pool[idx]);
+  }
+  return result;
+}
+
+function computeAlloc() {
+  const { year, month } = MONTHS[currentMonthIdx];
+  const allDates   = [...firstHalfDates(year, month), ...secondHalfDates(year, month)];
+  const requests   = requestsData;   // use preloaded global
+  const staff      = staffData;      // use preloaded global
+  const periodDays = allDates.length;
+  const result     = {};
+
+  // In "keep" mode, start from existing shift (deep copy)
+  if (allocMode === 'keep') {
+    Object.keys(shiftData).forEach(name => {
+      result[name] = Object.assign({}, shiftData[name]);
+    });
+  }
+
+  function availDates(s) {
+    const req = requests[s.name] || {};
+    return allDates.filter(d => req[fmt(d)] !== '×');
+  }
+
+  function target(s, field) {
+    return Math.round(periodDays / 7 * (s[field] || 0));
+  }
+
+  // Bug fix F: in keep mode, don't count × as work and don't allocate over ×
+  function allocStaff(s, pool, t) {
+    if (!result[s.name]) result[s.name] = {};
+    const filled = Object.keys(result[s.name]).filter(ds => result[s.name][ds] === '○');
+    // Available: in pool, not already ○, and not marked × in keep mode
+    const avail = pool.filter(ds => {
+      const existing = result[s.name][ds];
+      return existing !== '○' && existing !== '×';
+    });
+    const need = Math.max(0, t - filled.length);
+    selectEvenly(avail, need).forEach(ds => { result[s.name][ds] = '○'; });
+  }
+
+  const kitsuke  = staff.filter(s => s.role === '着付');
+  const biyou    = staff.filter(s => s.role === '美容');
+  const katazuke = staff.filter(s => s.role === '片付');
+  const mix      = staff.filter(s => s.role === '着付/片付');
+
+  // Phase 1: 着付
+  kitsuke.forEach(s => {
+    const pool = availDates(s).map(fmt);
+    allocStaff(s, pool, target(s, 'daysPerWeek'));
+  });
+
+  // Collect all kitsuke-allocated days
+  const kitsukeDays = new Set();
+  kitsuke.forEach(s => {
+    if (result[s.name]) {
+      Object.entries(result[s.name]).forEach(([ds, v]) => { if (v === '○') kitsukeDays.add(ds); });
+    }
+  });
+
+  // Phase 2: 美容 — prefer days that overlap with 着付
+  biyou.forEach(s => {
+    if (!result[s.name]) result[s.name] = {};
+    const filled = Object.keys(result[s.name]).filter(ds => result[s.name][ds] === '○');
+    const avail  = availDates(s).map(fmt).filter(ds => {
+      const existing = result[s.name][ds];
+      return existing !== '○' && existing !== '×';
+    });
+    const need      = Math.max(0, target(s, 'daysPerWeek') - filled.length);
+    const preferred = avail.filter(ds =>  kitsukeDays.has(ds));
+    const others    = avail.filter(ds => !kitsukeDays.has(ds));
+    let selected;
+    if (preferred.length >= need) {
+      selected = selectEvenly(preferred, need);
+    } else {
+      selected = [...preferred, ...selectEvenly(others, need - preferred.length)];
+    }
+    selected.forEach(ds => { result[s.name][ds] = '○'; });
+  });
+
+  // Phase 3: 片付け (独立)
+  katazuke.forEach(s => {
+    const pool = availDates(s).map(fmt);
+    allocStaff(s, pool, target(s, 'daysPerWeek'));
+  });
+
+  // Phase 4: 着付/片付け (河野型)
+  mix.forEach(s => {
+    if (!result[s.name]) result[s.name] = {};
+    const avail = availDates(s).map(fmt).filter(ds => {
+      const existing = result[s.name][ds];
+      return existing !== '○' && existing !== '×';
+    });
+    const filled    = Object.keys(result[s.name]).filter(ds => result[s.name][ds] === '○');
+    const filledKit = filled.filter(ds =>  kitsukeDays.has(ds)).length;
+    const filledKat = filled.filter(ds => !kitsukeDays.has(ds)).length;
+
+    const needKit = Math.max(0, target(s, 'daysPerWeek')  - filledKit);
+    const needKat = Math.max(0, target(s, 'daysKatazuke') - filledKat);
+
+    const kitPool    = avail.filter(ds => kitsukeDays.has(ds));
+    const kitSelected = selectEvenly(kitPool, needKit);
+    kitSelected.forEach(ds => { result[s.name][ds] = '○'; });
+
+    const kitSet  = new Set(kitSelected);
+    const katPool = avail.filter(ds => !kitSet.has(ds));
+    selectEvenly(katPool, needKat).forEach(ds => { result[s.name][ds] = '○'; });
+  });
+
+  return result;
+}
+
+// Bug fix E: reload fresh data before computing
+async function previewAlloc() {
+  const { year, month } = MONTHS[currentMonthIdx];
+  showLoading();
+  try {
+    const [freshShift, { requests, timestamps }, staffRows] = await Promise.all([
+      dbLoadShift(year, month),
+      dbLoadRequests(year, month),
+      dbLoadStaff(),
+    ]);
+    shiftData      = freshShift;
+    requestsData   = requests;
+    timestampsData = timestamps;
+    staffData      = staffRows.map(r => ({
+      name:         r.name,
+      role:         r.role,
+      daysPerWeek:  r.days_per_week,
+      daysKatazuke: r.days_katazuke,
+    }));
+
+    pendingAlloc = computeAlloc();
+    const staff  = staffData;
+
+    // Pairing stats
+    const kitDays   = new Set();
+    const biyouDays = new Set();
+    staff.filter(s => s.role === '着付').forEach(s => {
+      if (pendingAlloc[s.name])
+        Object.entries(pendingAlloc[s.name]).forEach(([ds, v]) => { if (v === '○') kitDays.add(ds); });
+    });
+    staff.filter(s => s.role === '美容').forEach(s => {
+      if (pendingAlloc[s.name])
+        Object.entries(pendingAlloc[s.name]).forEach(([ds, v]) => { if (v === '○') biyouDays.add(ds); });
+    });
+    const paired = [...kitDays].filter(ds => biyouDays.has(ds)).length;
+
+    let html = `<p style="font-size:11px;color:#888;margin-bottom:10px">
+      モード: ${allocMode === 'keep' ? '休み希望以外に割り振り（既存の○を保持）' : '全リセットして割り振り'}
+    </p>`;
+    html += `<div class="pairing-stat">
+      着付・美容ペア確認　着付日数: ${kitDays.size}日 / 美容日数: ${biyouDays.size}日 / 同日重複: ${paired}日
+    </div>`;
+
+    ROLE_ORDER.forEach(role => {
+      const roleStaff = staff.filter(s => s.role === role);
+      if (!roleStaff.length) return;
+      const meta = ROLE_META[role];
+      html += `<div class="preview-role-hdr ${meta.cls}" style="background:transparent">${meta.label}</div>`;
+
+      roleStaff.forEach(s => {
+        const entries = pendingAlloc[s.name]
+          ? Object.entries(pendingAlloc[s.name]).filter(([, v]) => v === '○')
+          : [];
+        const cnt  = entries.length;
+        const days = entries.map(([ds]) => {
+          const d = new Date(ds + 'T00:00:00');
+          return `${d.getMonth()+1}/${d.getDate()}`;
+        }).join('、');
+        html += `<div class="preview-staff-row">
+          <strong>${escHtml(s.name)}</strong>　<span style="color:#888">計${cnt}日</span>
+          <div class="preview-days">${days || 'なし'}</div>
+        </div>`;
+      });
+    });
+
+    document.getElementById('previewBody').innerHTML = html;
+    document.getElementById('previewModal').classList.add('open');
+  } catch(e) {
+    alert('割り振りの計算に失敗しました');
+    console.error('previewAlloc error:', e);
+  } finally {
+    hideLoading();
+  }
+}
+
+function closePreview() {
+  document.getElementById('previewModal').classList.remove('open');
+  pendingAlloc = null;
+}
+
+async function applyAlloc() {
+  if (!pendingAlloc) return;
+  const { year, month } = MONTHS[currentMonthIdx];
+
+  document.getElementById('applyAllocBtn').disabled = true;
+  showLoading();
+  try {
+    if (allocMode === 'reset') {
+      const { error } = await sb.from('shifts').delete().eq('year', year).eq('month', month);
+      if (error) throw error;
+    }
+
+    // Build rows to upsert
+    const rows = [];
+    Object.entries(pendingAlloc).forEach(([staffName, dates]) => {
+      Object.entries(dates).forEach(([dateStr, value]) => {
+        rows.push({ year, month, staff_name: staffName, date_str: dateStr, value });
+      });
+    });
+
+    if (rows.length > 0) {
+      const { error } = await sb.from('shifts').upsert(rows);
+      if (error) throw error;
+    }
+
+    shiftData = pendingAlloc;
+    closePreview();
+    renderShiftTable();
+  } catch(e) {
+    alert('割り振りの保存に失敗しました');
+    console.error('applyAlloc error:', e);
+  } finally {
+    document.getElementById('applyAllocBtn').disabled = false;
+    hideLoading();
+  }
+}
+
+// ============================================================
+// Requests table
+// ============================================================
+
+function renderRequestsTable() {
+  const { year, month } = MONTHS[currentMonthIdx];
+  const fh       = firstHalfDates(year, month);
+  const sh       = secondHalfDates(year, month);
+  const allDates = [...fh, ...sh];
+  const py = month === 1 ? year - 1 : year;
+  const pm = month === 1 ? 12 : month - 1;
+
+  const hasReqs = staffData.some(s => {
+    const r = requestsData[s.name];
+    return r && Object.keys(r).length > 0;
+  });
+
+  if (!hasReqs) {
+    document.getElementById('requestsContent').innerHTML =
+      '<div class="empty-msg">この月の休み希望申請はまだありません。</div>';
+    return;
+  }
+
+  let html = `<div class="period-info" style="margin-bottom:12px">
+    令和${reiwaYear(year)}年${month}月分　${py}年${pm}月26日〜${year}年${month}月25日
+  </div><div class="req-table-wrap"><table class="req-table"><thead><tr>`;
+
+  html += '<th class="sticky-name" style="font-size:10px">スタッフ</th>';
+  allDates.forEach(d => {
+    const sat = isSat(d) ? ' style="color:#4466aa"' : isSun(d) ? ' style="color:#aa4444"' : '';
+    html += `<th${sat}>${d.getDate()}<br><span style="font-size:8px">${DOW_JP[d.getDay()]}</span></th>`;
+  });
+  html += '<th style="font-size:10px">休み希望</th><th style="font-size:10px">申請日時</th></tr></thead><tbody>';
+
+  ROLE_ORDER.forEach(role => {
+    const roleStaff = staffData.filter(s => s.role === role);
+    if (!roleStaff.length) return;
+    const meta = ROLE_META[role];
+    html += `<tr><td colspan="${allDates.length + 3}" class="${meta.rhCls}"
+      style="padding:3px 8px;font-size:10px;font-weight:bold;text-align:left">${meta.label}</td></tr>`;
+
+    roleStaff.forEach(s => {
+      const req  = requestsData[s.name] || {};
+      const offs = Object.values(req).filter(v => v === '×').length;
+      const ts   = timestampsData[s.name] || '未申請';
+      html += `<tr><td class="sticky-name">${escHtml(s.name)}</td>`;
+      allDates.forEach(d => {
+        const isOff = req[fmt(d)] === '×';
+        html += `<td class="${isOff ? 'req-off-cell' : ''}">${isOff ? '×' : ''}</td>`;
+      });
+      html += `<td style="font-weight:bold;color:#aa3333">${offs}日</td>`;
+      html += `<td class="ts-cell">${escHtml(ts)}</td></tr>`;
+    });
+  });
+
+  html += '</tbody></table></div>';
+  document.getElementById('requestsContent').innerHTML = html;
+}
+
+// ============================================================
+// Settings
+// ============================================================
+
+async function renderSettings() {
+  showLoading();
+  try {
+    const rows = await dbLoadStaff();
+    let html = '';
+    rows.forEach(r => {
+      const meta    = ROLE_META[r.role] || { cls: '', label: r.role };
+      const isMix   = r.role === '着付/片付';
+      const idDisp  = r.login_id ? escHtml(r.login_id) : '—';
+      const pwStat  = r.login_id
+        ? '<span class="cred-set">設定済み</span>'
+        : '<span class="cred-unset">未設定</span>';
+      html += `<tr>
+        <td style="font-weight:bold;padding-left:12px">${escHtml(r.name)}</td>
+        <td><span class="settings-role-badge ${meta.cls}">${meta.label}</span></td>
+        <td><input type="number" class="settings-input" value="${r.days_per_week}" min="0" max="7"
+          onchange="updateStaff('${r.name}','daysPerWeek',this.value)"></td>
+        <td>${isMix
+          ? `<input type="number" class="settings-input" value="${r.days_katazuke || 0}" min="0" max="7"
+              onchange="updateStaff('${r.name}','daysKatazuke',this.value)">`
+          : '—'}</td>
+        <td style="font-size:11px;color:#555">${idDisp}</td>
+        <td>${pwStat}　<button class="btn-auth" onclick="openCredModal('${r.name}')">設定</button></td>
+        <td><button class="btn-remove" onclick="removeStaff('${r.name}')">削除</button></td>
+      </tr>`;
+    });
+    document.getElementById('settingsBody').innerHTML = html;
+    // Update in-memory staffData too
+    staffData = rows.map(r => ({
+      name:         r.name,
+      role:         r.role,
+      daysPerWeek:  r.days_per_week,
+      daysKatazuke: r.days_katazuke,
+    }));
+  } catch(e) {
+    alert('スタッフ設定の読み込みに失敗しました');
+    console.error('renderSettings error:', e);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function updateStaff(name, field, val) {
+  const dbField = field === 'daysPerWeek' ? 'days_per_week' : 'days_katazuke';
+  const numVal  = Math.max(0, Math.min(7, Number(val)));
+  try {
+    const { error } = await sb.from('staff').update({ [dbField]: numVal }).eq('name', name);
+    if (error) throw error;
+    // Update in-memory staffData
+    const s = staffData.find(x => x.name === name);
+    if (s) s[field] = numVal;
+  } catch(e) {
+    alert('更新に失敗しました');
+    console.error('updateStaff error:', e);
+  }
+}
+
+async function removeStaff(name) {
+  if (!confirm(`${name} を削除しますか？\nシフトデータ・申請データも削除されます。`)) return;
+  showLoading();
+  try {
+    // Delete in order to avoid FK issues (none here, but be safe)
+    await Promise.all([
+      sb.from('shifts').delete().eq('staff_name', name),
+      sb.from('requests').delete().eq('staff_name', name),
+    ]);
+    const { error } = await sb.from('staff').delete().eq('name', name);
+    if (error) throw error;
+    await renderSettings();
+  } catch(e) {
+    alert('削除に失敗しました');
+    console.error('removeStaff error:', e);
+  } finally {
+    hideLoading();
+  }
+}
+
+async function addStaff() {
+  const name = document.getElementById('newName').value.trim();
+  const role = document.getElementById('newRole').value;
+  const days = Math.max(0, Math.min(7, Number(document.getElementById('newDays').value)));
+  const kdys = Math.max(0, Math.min(7, Number(document.getElementById('newKatazukeDays').value)));
+
+  if (!name) { alert('名前を入力してください'); return; }
+
+  showLoading();
+  try {
+    // Check duplicate name
+    const { data: existing } = await sb.from('staff').select('name').eq('name', name).maybeSingle();
+    if (existing) { alert('同じ名前のスタッフが既にいます'); return; }
+
+    // Get max sort_order
+    const { data: sortData } = await sb
+      .from('staff').select('sort_order')
+      .order('sort_order', { ascending: false }).limit(1);
+    const maxOrder = sortData?.[0]?.sort_order ?? -1;
+
+    const newRow = { name, role, days_per_week: days, sort_order: maxOrder + 1 };
+    if (role === '着付/片付') newRow.days_katazuke = kdys;
+
+    const { error } = await sb.from('staff').insert(newRow);
+    if (error) throw error;
+
+    document.getElementById('newName').value = '';
+    await renderSettings();
+  } catch(e) {
+    alert('追加に失敗しました');
+    console.error('addStaff error:', e);
+  } finally {
+    hideLoading();
+  }
+}
+
+function toggleKatazukeField() {
+  const isMix = document.getElementById('newRole').value === '着付/片付';
+  document.getElementById('lblKatazuke').style.display     = isMix ? '' : 'none';
+  document.getElementById('newKatazukeDays').style.display = isMix ? '' : 'none';
+}
+
+// ============================================================
+// Notes
+// ============================================================
+
+async function loadNotes() {
+  const { year, month } = MONTHS[currentMonthIdx];
+  const content = await dbLoadNotes(year, month);
+  document.getElementById('notesArea').value = content;
+}
+
+let notesSaved = false;
+function debounceSaveNotes() {
+  clearTimeout(notesSaveTimer);
+  notesSaveTimer = setTimeout(async () => {
+    const { year, month } = MONTHS[currentMonthIdx];
+    const content = document.getElementById('notesArea').value;
+    try {
+      await dbSaveNotes(year, month, content);
+      const ind = document.getElementById('notesSaved');
+      ind.classList.add('show');
+      setTimeout(() => ind.classList.remove('show'), 2000);
+    } catch(e) {
+      console.error('saveNotes error:', e);
+    }
+  }, 800);
+}
+
+// ============================================================
+// Export / Import
+// ============================================================
+
+async function exportData() {
+  const { year, month } = MONTHS[currentMonthIdx];
+  showLoading();
+  try {
+    const [shift, { requests }, staff, notes] = await Promise.all([
+      dbLoadShift(year, month),
+      dbLoadRequests(year, month),
+      dbLoadStaff().then(rows => rows.map(r => ({
+        name: r.name, role: r.role,
+        daysPerWeek: r.days_per_week, daysKatazuke: r.days_katazuke,
+      }))),
+      dbLoadNotes(year, month),
+    ]);
+    const data = { year, month, shift, requests, staff, notes, exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `shift_${year}_${String(month).padStart(2,'0')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('エクスポートに失敗しました');
+    console.error('exportData error:', e);
+  } finally {
+    hideLoading();
+  }
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const data = JSON.parse(e.target.result);
+
+      // Bug fix D: validate structure
+      if (!Number.isInteger(data.year) || !Number.isInteger(data.month)) {
+        alert('無効なファイル形式です（year/monthが不正）'); return;
+      }
+      if (data.shift !== undefined && (typeof data.shift !== 'object' || Array.isArray(data.shift))) {
+        alert('シフトデータの形式が不正です'); return;
+      }
+      if (!confirm(`${data.year}年${data.month}月のシフトデータをインポートしますか？\n（スタッフ設定・申請データはインポートされません）`)) return;
+
+      showLoading();
+      try {
+        // Import shifts only (not staff config or requests)
+        await sb.from('shifts').delete().eq('year', data.year).eq('month', data.month);
+        if (data.shift && Object.keys(data.shift).length > 0) {
+          const rows = [];
+          Object.entries(data.shift).forEach(([staffName, dates]) => {
+            if (typeof dates !== 'object' || Array.isArray(dates)) return;
+            Object.entries(dates).forEach(([dateStr, value]) => {
+              if (value) rows.push({ year: data.year, month: data.month, staff_name: staffName, date_str: dateStr, value });
+            });
+          });
+          if (rows.length > 0) {
+            const { error } = await sb.from('shifts').insert(rows);
+            if (error) throw error;
+          }
+        }
+        // Import notes if present
+        if (typeof data.notes === 'string' && data.notes) {
+          await dbSaveNotes(data.year, data.month, data.notes);
+        }
+
+        const idx = MONTHS.findIndex(m => m.year === data.year && m.month === data.month);
+        if (idx >= 0) { currentMonthIdx = idx; buildMonthTabs(); }
+        await loadAndRender();
+        alert('インポートが完了しました');
+      } finally {
+        hideLoading();
+      }
+    } catch(err) {
+      alert('ファイルの読み込みに失敗しました');
+      console.error('importData error:', err);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ============================================================
+// Credentials modal
+// ============================================================
+
+function openCredModal(name) {
+  credModalTarget = name;
+  document.getElementById('credTitle').textContent      = `${name} の認証設定`;
+  document.getElementById('credId').value               = '';
+  document.getElementById('credPw').value               = '';
+  document.getElementById('credPw2').value              = '';
+  document.getElementById('credError').textContent      = '';
+  document.getElementById('credModal').classList.add('open');
+}
+
+function closeCredModal() {
+  document.getElementById('credModal').classList.remove('open');
+  credModalTarget = null;
+}
+
+async function saveCredential() {
+  const id  = document.getElementById('credId').value.trim();
+  const pw  = document.getElementById('credPw').value;
+  const pw2 = document.getElementById('credPw2').value;
+  const err = document.getElementById('credError');
+  err.textContent = '';
+
+  if (!id)        { err.textContent = 'IDを入力してください'; return; }
+  if (!pw)        { err.textContent = 'パスワードを入力してください'; return; }
+  if (pw !== pw2) { err.textContent = 'パスワードが一致しません'; return; }
+
+  document.getElementById('credSaveBtn').disabled = true;
+  showLoading();
+  try {
+    // Check duplicate login_id
+    const { data: dup } = await sb
+      .from('staff')
+      .select('name')
+      .eq('login_id', id)
+      .neq('name', credModalTarget)
+      .maybeSingle();
+    if (dup) {
+      err.textContent = `このIDは${dup.name}が使用中です`;
+      return;
+    }
+
+    const { error } = await sb.from('staff')
+      .update({ login_id: id, password: pw })
+      .eq('name', credModalTarget);
+    if (error) throw error;
+
+    closeCredModal();
+    await renderSettings();
+  } catch(e) {
+    err.textContent = '保存に失敗しました';
+    console.error('saveCredential error:', e);
+  } finally {
+    document.getElementById('credSaveBtn').disabled = false;
+    hideLoading();
+  }
+}
+
+// ============================================================
+// Init
+// ============================================================
+
+window.addEventListener('load', async () => {
+  const today = new Date();
+  for (let i = 0; i < MONTHS.length; i++) {
+    const { year, month } = MONTHS[i];
+    if (new Date(year, month - 1, 25) >= today) { currentMonthIdx = i; break; }
+  }
+  buildMonthTabs();
+  await loadAndRender();
+});
+</script>
+</body>
+</html>
