@@ -328,6 +328,92 @@
     .success-btn:hover { opacity: 0.85; }
     .success-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    /* ===== Password change modal ===== */
+    .pw-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 8000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pw-modal-overlay.hidden { display: none; }
+    .pw-modal-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px 22px;
+      width: 88%;
+      max-width: 340px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .pw-modal-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #6b3a2a;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .pw-field { margin-bottom: 12px; }
+    .pw-label { font-size: 11px; color: #888; display: block; margin-bottom: 4px; }
+    .pw-input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .pw-input:focus { outline: none; border-color: #c49a7a; }
+    .pw-error {
+      color: #cc4444;
+      font-size: 12px;
+      text-align: center;
+      margin-top: 4px;
+      min-height: 16px;
+    }
+    .pw-modal-footer {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .pw-btn-cancel {
+      flex: 1;
+      padding: 9px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      color: #666;
+    }
+    .pw-btn-save {
+      flex: 2;
+      padding: 9px;
+      border: none;
+      border-radius: 6px;
+      background: #6b3a2a;
+      color: #fff;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .pw-btn-save:hover { background: #8b4a3a; }
+    .pw-btn-save:disabled { background: #aaa; cursor: not-allowed; }
+    .chpw-btn {
+      font-size: 11px;
+      color: #ffccaa;
+      background: none;
+      border: 1px solid #ffccaa;
+      padding: 3px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .chpw-btn:hover { background: rgba(255,255,255,0.1); }
+
     /* Shift view */
     .shift-summary {
       background: #fff;
@@ -425,6 +511,30 @@
   <!-- シフト確認 tab -->
   <div id="secShift" class="page" style="padding-top:0;display:none">
     <div id="shiftViewArea"></div>
+  </div>
+</div>
+
+<!-- Password change modal -->
+<div id="pwModal" class="pw-modal-overlay hidden">
+  <div class="pw-modal-box">
+    <div class="pw-modal-title">パスワード変更</div>
+    <div class="pw-field">
+      <label class="pw-label">現在のパスワード</label>
+      <input type="password" class="pw-input" id="pwCurrent" placeholder="現在のパスワード" autocomplete="current-password">
+    </div>
+    <div class="pw-field">
+      <label class="pw-label">新しいパスワード</label>
+      <input type="password" class="pw-input" id="pwNew" placeholder="新しいパスワード" autocomplete="new-password">
+    </div>
+    <div class="pw-field">
+      <label class="pw-label">新しいパスワード（確認）</label>
+      <input type="password" class="pw-input" id="pwNew2" placeholder="もう一度入力" autocomplete="new-password">
+    </div>
+    <div class="pw-error" id="pwError"></div>
+    <div class="pw-modal-footer">
+      <button class="pw-btn-cancel" onclick="closePwModal()">キャンセル</button>
+      <button class="pw-btn-save" id="pwSaveBtn" onclick="changePassword()">変更する</button>
+    </div>
   </div>
 </div>
 
@@ -601,6 +711,7 @@ function enterMainView(staffObj) {
   const meta = ROLE_META[staffObj.role] || { label: staffObj.role, cls: '' };
   document.getElementById('headerRight').innerHTML =
     `<span class="header-name">${staffObj.name}</span>
+     <button class="chpw-btn" onclick="openPwModal()">PW変更</button>
      <button class="logout-btn" onclick="doLogout()">ログアウト</button>`;
 
   document.getElementById('dispName').textContent = staffObj.name;
@@ -885,6 +996,67 @@ function buildShiftGrid(dates, myShift) {
 
   html += '</div>';
   return html;
+}
+
+// ============================================================
+// Password change
+// ============================================================
+
+function openPwModal() {
+  document.getElementById('pwCurrent').value = '';
+  document.getElementById('pwNew').value     = '';
+  document.getElementById('pwNew2').value    = '';
+  document.getElementById('pwError').textContent = '';
+  document.getElementById('pwModal').classList.remove('hidden');
+  document.getElementById('pwCurrent').focus();
+}
+
+function closePwModal() {
+  document.getElementById('pwModal').classList.add('hidden');
+}
+
+async function changePassword() {
+  const cur  = document.getElementById('pwCurrent').value;
+  const nw   = document.getElementById('pwNew').value;
+  const nw2  = document.getElementById('pwNew2').value;
+  const errEl = document.getElementById('pwError');
+  const btn   = document.getElementById('pwSaveBtn');
+  errEl.textContent = '';
+
+  if (!cur)       { errEl.textContent = '現在のパスワードを入力してください'; return; }
+  if (!nw)        { errEl.textContent = '新しいパスワードを入力してください'; return; }
+  if (nw !== nw2) { errEl.textContent = '新しいパスワードが一致しません'; return; }
+  if (nw === cur) { errEl.textContent = '新しいパスワードは現在のパスワードと異なる必要があります'; return; }
+
+  btn.disabled = true;
+  showLoading();
+  try {
+    // Verify current password
+    const { data, error } = await sb
+      .from('staff')
+      .select('name')
+      .eq('name', selectedStaff.name)
+      .eq('password', cur)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) { errEl.textContent = '現在のパスワードが正しくありません'; return; }
+
+    // Update to new password
+    const { error: updErr } = await sb
+      .from('staff')
+      .update({ password: nw })
+      .eq('name', selectedStaff.name);
+    if (updErr) throw updErr;
+
+    closePwModal();
+    alert('パスワードを変更しました');
+  } catch(e) {
+    errEl.textContent = '通信エラーが発生しました。再度お試しください。';
+    console.error('changePassword error:', e);
+  } finally {
+    btn.disabled = false;
+    hideLoading();
+  }
 }
 
 // ============================================================

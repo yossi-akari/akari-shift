@@ -58,6 +58,144 @@
       border-radius: 10px;
     }
     .header-link:hover { background: rgba(255,255,255,0.1); }
+    .admin-header-right { display: flex; align-items: center; gap: 8px; }
+    .admin-chpw-btn, .admin-logout-btn {
+      font-size: 11px;
+      color: #ffccaa;
+      background: none;
+      border: 1px solid #ffccaa;
+      padding: 3px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .admin-chpw-btn:hover, .admin-logout-btn:hover { background: rgba(255,255,255,0.1); }
+
+    /* ===== Admin login screen ===== */
+    .admin-login-screen {
+      max-width: 400px;
+      margin: 60px auto 0;
+      padding: 0 20px;
+    }
+    .admin-login-logo {
+      text-align: center;
+      font-size: 22px;
+      font-weight: bold;
+      color: #3a2a1a;
+      letter-spacing: 3px;
+      margin-bottom: 4px;
+    }
+    .admin-login-subtitle {
+      text-align: center;
+      font-size: 11px;
+      color: #aaa;
+      letter-spacing: 2px;
+      margin-bottom: 28px;
+    }
+    .admin-login-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px 24px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .admin-login-card-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #3a2a1a;
+      margin-bottom: 18px;
+      text-align: center;
+    }
+    .admin-login-field { margin-bottom: 14px; }
+    .admin-login-label { font-size: 11px; color: #888; margin-bottom: 4px; display: block; }
+    .admin-login-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .admin-login-input:focus { outline: none; border-color: #8a6a4a; }
+    .admin-login-btn {
+      width: 100%;
+      padding: 12px;
+      background: #3a2a1a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      font-family: inherit;
+      margin-top: 4px;
+      letter-spacing: 1px;
+    }
+    .admin-login-btn:hover { background: #5a3a2a; }
+    .admin-login-btn:disabled { background: #aaa; cursor: not-allowed; }
+    .admin-login-error {
+      color: #cc4444;
+      font-size: 12px;
+      text-align: center;
+      margin-top: 10px;
+      min-height: 18px;
+    }
+
+    /* ===== Admin password change modal ===== */
+    .apw-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 8000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .apw-modal-overlay.hidden { display: none; }
+    .apw-modal-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px 22px;
+      width: 88%;
+      max-width: 340px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .apw-modal-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #3a2a1a;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .apw-field { margin-bottom: 12px; }
+    .apw-label { font-size: 11px; color: #888; display: block; margin-bottom: 4px; }
+    .apw-input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .apw-input:focus { outline: none; border-color: #8a6a4a; }
+    .apw-error {
+      color: #cc4444;
+      font-size: 12px;
+      text-align: center;
+      margin-top: 4px;
+      min-height: 16px;
+    }
+    .apw-footer { display: flex; gap: 8px; margin-top: 14px; }
+    .apw-btn-cancel {
+      flex: 1; padding: 9px; border: 1px solid #ddd; border-radius: 6px;
+      background: #fff; font-size: 13px; cursor: pointer; font-family: inherit; color: #666;
+    }
+    .apw-btn-save {
+      flex: 2; padding: 9px; border: none; border-radius: 6px;
+      background: #3a2a1a; color: #fff; font-size: 13px; font-weight: bold;
+      cursor: pointer; font-family: inherit;
+    }
+    .apw-btn-save:hover { background: #5a3a2a; }
+    .apw-btn-save:disabled { background: #aaa; cursor: not-allowed; }
 
     .month-tabs-wrap {
       background: #2a1a0a;
@@ -554,9 +692,61 @@
   <div class="spinner"></div>処理中...
 </div>
 
+<!-- Admin login screen -->
+<div id="adminLoginScreen" hidden>
+  <div class="admin-login-screen">
+    <div class="admin-login-logo">あかり</div>
+    <div class="admin-login-subtitle">管理者専用</div>
+    <div class="admin-login-card">
+      <div class="admin-login-card-title">管理者ログイン</div>
+      <div class="admin-login-field">
+        <label class="admin-login-label">ログインID</label>
+        <input type="text" class="admin-login-input" id="adminLoginId" placeholder="ID" autocomplete="username">
+      </div>
+      <div class="admin-login-field">
+        <label class="admin-login-label">パスワード</label>
+        <input type="password" class="admin-login-input" id="adminLoginPassword" placeholder="パスワード" autocomplete="current-password">
+      </div>
+      <button class="admin-login-btn" id="adminLoginBtn" onclick="doAdminLogin()">ログイン</button>
+      <div class="admin-login-error" id="adminLoginError"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin password change modal -->
+<div id="apwModal" class="apw-modal-overlay hidden">
+  <div class="apw-modal-box">
+    <div class="apw-modal-title">管理者パスワード変更</div>
+    <div class="apw-field">
+      <label class="apw-label">現在のパスワード</label>
+      <input type="password" class="apw-input" id="apwCurrent" placeholder="現在のパスワード" autocomplete="current-password">
+    </div>
+    <div class="apw-field">
+      <label class="apw-label">新しいパスワード</label>
+      <input type="password" class="apw-input" id="apwNew" placeholder="新しいパスワード" autocomplete="new-password">
+    </div>
+    <div class="apw-field">
+      <label class="apw-label">新しいパスワード（確認）</label>
+      <input type="password" class="apw-input" id="apwNew2" placeholder="もう一度入力" autocomplete="new-password">
+    </div>
+    <div class="apw-error" id="apwError"></div>
+    <div class="apw-footer">
+      <button class="apw-btn-cancel" onclick="closeApwModal()">キャンセル</button>
+      <button class="apw-btn-save" id="apwSaveBtn" onclick="changeAdminPassword()">変更する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main content (shown after login) -->
+<div id="adminMainContent" hidden>
+
 <header>
   <div class="header-title">シフト管理　管理者用</div>
-  <a href="staff.html" class="header-link">スタッフページ →</a>
+  <div class="admin-header-right">
+    <a href="staff.html" class="header-link">スタッフページ →</a>
+    <button class="admin-chpw-btn" onclick="openApwModal()">PW変更</button>
+    <button class="admin-logout-btn" onclick="doAdminLogout()">ログアウト</button>
+  </div>
 </header>
 
 <div class="month-tabs-wrap">
@@ -649,6 +839,8 @@
   </div>
 
 </div>
+
+</div><!-- /adminMainContent -->
 
 <!-- Cell popup -->
 <div id="cellPopup">
@@ -1738,10 +1930,62 @@ async function saveCredential() {
 }
 
 // ============================================================
-// Init
+// Admin login / logout
 // ============================================================
 
-window.addEventListener('load', async () => {
+let loggedInAdminId = null;
+
+async function doAdminLogin() {
+  const id  = document.getElementById('adminLoginId').value.trim();
+  const pwd = document.getElementById('adminLoginPassword').value;
+  const err = document.getElementById('adminLoginError');
+  const btn = document.getElementById('adminLoginBtn');
+  err.textContent = '';
+
+  if (!id || !pwd) { err.textContent = 'IDとパスワードを入力してください'; return; }
+
+  btn.disabled = true;
+  showLoading();
+  try {
+    const { data, error } = await sb
+      .from('admins')
+      .select('login_id')
+      .eq('login_id', id)
+      .eq('password', pwd)
+      .maybeSingle();
+    if (error) throw error;
+
+    if (!data) {
+      err.textContent = 'IDまたはパスワードが正しくありません';
+      document.getElementById('adminLoginPassword').value = '';
+      return;
+    }
+
+    loggedInAdminId = id;
+    sessionStorage.setItem('loggedInAdmin', id);
+    enterAdminMain();
+  } catch(e) {
+    err.textContent = '通信エラーが発生しました。再度お試しください。';
+    console.error('Admin login error:', e);
+  } finally {
+    btn.disabled = false;
+    hideLoading();
+  }
+}
+
+function doAdminLogout() {
+  sessionStorage.removeItem('loggedInAdmin');
+  loggedInAdminId = null;
+  document.getElementById('adminMainContent').hidden = true;
+  document.getElementById('adminLoginScreen').hidden = false;
+  document.getElementById('adminLoginId').value       = '';
+  document.getElementById('adminLoginPassword').value = '';
+  document.getElementById('adminLoginError').textContent = '';
+}
+
+async function enterAdminMain() {
+  document.getElementById('adminLoginScreen').hidden = true;
+  document.getElementById('adminMainContent').hidden = false;
   const today = new Date();
   for (let i = 0; i < MONTHS.length; i++) {
     const { year, month } = MONTHS[i];
@@ -1749,6 +1993,87 @@ window.addEventListener('load', async () => {
   }
   buildMonthTabs();
   await loadAndRender();
+}
+
+// ============================================================
+// Admin password change
+// ============================================================
+
+function openApwModal() {
+  document.getElementById('apwCurrent').value = '';
+  document.getElementById('apwNew').value     = '';
+  document.getElementById('apwNew2').value    = '';
+  document.getElementById('apwError').textContent = '';
+  document.getElementById('apwModal').classList.remove('hidden');
+  document.getElementById('apwCurrent').focus();
+}
+
+function closeApwModal() {
+  document.getElementById('apwModal').classList.add('hidden');
+}
+
+async function changeAdminPassword() {
+  const cur   = document.getElementById('apwCurrent').value;
+  const nw    = document.getElementById('apwNew').value;
+  const nw2   = document.getElementById('apwNew2').value;
+  const errEl = document.getElementById('apwError');
+  const btn   = document.getElementById('apwSaveBtn');
+  errEl.textContent = '';
+
+  if (!cur)       { errEl.textContent = '現在のパスワードを入力してください'; return; }
+  if (!nw)        { errEl.textContent = '新しいパスワードを入力してください'; return; }
+  if (nw !== nw2) { errEl.textContent = '新しいパスワードが一致しません'; return; }
+  if (nw === cur) { errEl.textContent = '新しいパスワードは現在のものと異なる必要があります'; return; }
+
+  btn.disabled = true;
+  showLoading();
+  try {
+    // Verify current password
+    const { data, error } = await sb
+      .from('admins')
+      .select('login_id')
+      .eq('login_id', loggedInAdminId)
+      .eq('password', cur)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) { errEl.textContent = '現在のパスワードが正しくありません'; return; }
+
+    const { error: updErr } = await sb
+      .from('admins')
+      .update({ password: nw })
+      .eq('login_id', loggedInAdminId);
+    if (updErr) throw updErr;
+
+    closeApwModal();
+    alert('パスワードを変更しました');
+  } catch(e) {
+    errEl.textContent = '通信エラーが発生しました。再度お試しください。';
+    console.error('changeAdminPassword error:', e);
+  } finally {
+    btn.disabled = false;
+    hideLoading();
+  }
+}
+
+// ============================================================
+// Init
+// ============================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('adminLoginPassword').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doAdminLogin();
+  });
+});
+
+window.addEventListener('load', async () => {
+  hideLoading();
+  const savedId = sessionStorage.getItem('loggedInAdmin');
+  if (savedId) {
+    loggedInAdminId = savedId;
+    await enterAdminMain();
+  } else {
+    document.getElementById('adminLoginScreen').hidden = false;
+  }
 });
 </script>
 </body>
