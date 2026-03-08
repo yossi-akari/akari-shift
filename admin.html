@@ -562,6 +562,120 @@
     .cred-input:focus { outline: none; border-color: #c49a7a; }
     .cred-error { font-size: 11px; color: #cc4444; margin-top: 4px; min-height: 16px; }
 
+    /* ===== Closed day ===== */
+    .date-th.closed {
+      background: #c8c8c8 !important;
+      color: #666;
+    }
+    .date-th.closed .date-num { color: #666; }
+    .date-th.closed .date-dow { color: #888; }
+    .date-th.closed .closed-label {
+      font-size: 8px;
+      font-weight: bold;
+      color: #555;
+      display: block;
+      margin-top: 1px;
+    }
+    .shift-cell.closed {
+      background: #e0e0e0 !important;
+      cursor: default !important;
+      pointer-events: none;
+    }
+
+    /* ===== Closed days modal ===== */
+    #closedDaysModal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #closedDaysModal.open { display: flex; }
+    .closed-days-box {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      width: 300px;
+      max-width: 92%;
+    }
+    .closed-days-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #3a2a1a;
+      margin-bottom: 14px;
+      text-align: center;
+    }
+    .dow-checkboxes {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .dow-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+    }
+    .dow-item.sat { color: #4466aa; }
+    .dow-item.sun { color: #aa4444; }
+    .dow-item input[type=checkbox] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: #3a2a1a;
+    }
+    .closed-days-note {
+      font-size: 10px;
+      color: #888;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .closed-days-divider {
+      border: none;
+      border-top: 1px solid #eee;
+      margin: 12px 0 10px;
+    }
+    .closed-dates-section-title {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .closed-dates-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-height: 140px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    .closed-date-btn {
+      padding: 3px 7px;
+      font-size: 11px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      color: #444;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .closed-date-btn.active {
+      background: #3a2a1a;
+      color: #fff;
+      border-color: #3a2a1a;
+    }
+    .closed-date-btn.dow-closed {
+      background: #e0e0e0;
+      color: #999;
+      cursor: default;
+      pointer-events: none;
+    }
+
     .add-staff-form {
       background: #fff;
       border-radius: 8px;
@@ -737,6 +851,34 @@
   </div>
 </div>
 
+<!-- Closed days modal -->
+<div id="closedDaysModal">
+  <div class="closed-days-box">
+    <div class="closed-days-title">定休日設定</div>
+    <div class="dow-checkboxes">
+      <div class="dow-item sun"><span>日</span><input type="checkbox" id="dow0"></div>
+      <div class="dow-item"><span>月</span><input type="checkbox" id="dow1"></div>
+      <div class="dow-item"><span>火</span><input type="checkbox" id="dow2"></div>
+      <div class="dow-item"><span>水</span><input type="checkbox" id="dow3"></div>
+      <div class="dow-item"><span>木</span><input type="checkbox" id="dow4"></div>
+      <div class="dow-item"><span>金</span><input type="checkbox" id="dow5"></div>
+      <div class="dow-item sat"><span>土</span><input type="checkbox" id="dow6"></div>
+    </div>
+    <div class="closed-days-note">チェックした曜日は自動割り振りの対象外になります</div>
+
+    <hr class="closed-days-divider">
+
+    <div class="closed-dates-section-title">特定日の休業日（今月）</div>
+    <div class="closed-dates-grid" id="closedDatesGrid"></div>
+    <div class="closed-days-note" style="margin-bottom:0">グレーは定休日（曜日設定済み）</div>
+
+    <div class="modal-footer" style="margin-top:12px">
+      <button class="btn-cancel" onclick="closeClosedDaysModal()">キャンセル</button>
+      <button class="btn-apply" onclick="saveClosedDays()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- Main content (shown after login) -->
 <div id="adminMainContent" hidden>
 
@@ -769,6 +911,7 @@
         <button class="mode-btn" id="modeReset" onclick="setMode('reset')">全リセット</button>
       </div>
       <button class="toolbar-btn primary" onclick="previewAlloc()">自動割り振り</button>
+      <button class="toolbar-btn" onclick="openClosedDaysModal()">定休日設定</button>
       <button class="toolbar-btn danger" onclick="resetShift()">シフトをリセット</button>
       <button class="toolbar-btn" onclick="exportData()">エクスポート</button>
       <label class="toolbar-btn" style="cursor:pointer">
@@ -938,6 +1081,8 @@ let allocMode       = 'keep';
 let activeCell      = null;
 let credModalTarget = null;
 let notesSaveTimer  = null;
+let closedWeekdays  = new Set(); // 定休曜日 (0=日,1=月,...,6=土)
+let closedDates     = new Set(); // 特定休業日 YYYY-MM-DD
 
 // ============================================================
 // Loading helpers
@@ -1033,6 +1178,41 @@ async function dbSaveNotes(year, month, content) {
   if (error) throw error;
 }
 
+async function dbLoadSettings() {
+  const { data, error } = await sb
+    .from('settings')
+    .select('value')
+    .eq('key', 'closed_weekdays')
+    .maybeSingle();
+  if (error) return new Set(); // テーブル未作成時は空セットで継続
+  return new Set(Array.isArray(data?.value) ? data.value : []);
+}
+
+async function dbSaveSettings(daysSet) {
+  const { error } = await sb.from('settings').upsert({
+    key: 'closed_weekdays',
+    value: [...daysSet],
+  });
+  if (error) throw error;
+}
+
+async function dbLoadClosedDates(year, month) {
+  const key = `closed_dates_${year}_${String(month).padStart(2,'0')}`;
+  const { data, error } = await sb
+    .from('settings')
+    .select('value')
+    .eq('key', key)
+    .maybeSingle();
+  if (error) return new Set();
+  return new Set(Array.isArray(data?.value) ? data.value : []);
+}
+
+async function dbSaveClosedDates(year, month, datesSet) {
+  const key = `closed_dates_${year}_${String(month).padStart(2,'0')}`;
+  const { error } = await sb.from('settings').upsert({ key, value: [...datesSet] });
+  if (error) throw error;
+}
+
 // ============================================================
 // Month tabs
 // ============================================================
@@ -1074,15 +1254,19 @@ async function loadAndRender() {
   const { year, month } = MONTHS[currentMonthIdx];
   showLoading();
   try {
-    const [shiftResult, { requests, timestamps }, staffRows, notes] = await Promise.all([
+    const [shiftResult, { requests, timestamps }, staffRows, notes, cwSet, cdSet] = await Promise.all([
       dbLoadShift(year, month),
       dbLoadRequests(year, month),
       dbLoadStaff(),
       dbLoadNotes(year, month),
+      dbLoadSettings(),
+      dbLoadClosedDates(year, month),
     ]);
     shiftData      = shiftResult;
     requestsData   = requests;
     timestampsData = timestamps;
+    closedWeekdays = cwSet;
+    closedDates    = cdSet;
     staffData      = staffRows.map(r => ({
       name:         r.name,
       role:         r.role,
@@ -1136,10 +1320,12 @@ function buildHalfTable(dates, staff, requests) {
   let html = '<table class="shift-table"><thead><tr>';
   html += '<th class="name-col" style="background:#fafaf8">スタッフ</th>';
   dates.forEach(d => {
-    const cls = isSat(d) ? ' sat' : isSun(d) ? ' sun' : '';
+    const isClosed = closedWeekdays.has(d.getDay()) || closedDates.has(fmt(d));
+    const cls = (isSat(d) ? ' sat' : isSun(d) ? ' sun' : '') + (isClosed ? ' closed' : '');
     html += `<th class="date-th${cls}">
       <div class="date-num">${d.getDate()}</div>
       <div class="date-dow">${DOW_JP[d.getDay()]}</div>
+      ${isClosed ? '<span class="closed-label">定休</span>' : ''}
     </th>`;
   });
   html += '</tr></thead><tbody>';
@@ -1158,7 +1344,12 @@ function buildHalfTable(dates, staff, requests) {
       html += `<tr class="staff-row" data-staff="${s.name}">`;
       html += `<td class="name-col ${meta.nameCls}">${s.name}</td>`;
       dates.forEach(d => {
-        const ds     = fmt(d);
+        const ds       = fmt(d);
+        const isClosed = closedWeekdays.has(d.getDay()) || closedDates.has(ds);
+        if (isClosed) {
+          html += `<td class="shift-cell closed"></td>`;
+          return;
+        }
         const val    = (shiftData[s.name] && shiftData[s.name][ds]) || '';
         const reqOff = sReqs[ds] === '×';
         let cls = 'shift-cell';
@@ -1167,7 +1358,6 @@ function buildHalfTable(dates, staff, requests) {
         else if (val) cls += ' val-time';
         if (reqOff) cls += ' req-off';
         const dot = reqOff ? '<span class="req-dot">✕</span>' : '';
-        // XSS prevention: escape val before inserting
         const safeVal = escHtml(val);
         html += `<td class="${cls}" data-date="${ds}" onclick="cellClick(this)">${dot}${safeVal}</td>`;
       });
@@ -1348,7 +1538,8 @@ function selectEvenly(pool, n) {
 
 function computeAlloc() {
   const { year, month } = MONTHS[currentMonthIdx];
-  const allDates   = [...firstHalfDates(year, month), ...secondHalfDates(year, month)];
+  const allDates   = [...firstHalfDates(year, month), ...secondHalfDates(year, month)]
+    .filter(d => !closedWeekdays.has(d.getDay()) && !closedDates.has(fmt(d))); // 定休日を除外
   const requests   = requestsData;   // use preloaded global
   const staff      = staffData;      // use preloaded global
   const periodDays = allDates.length;
@@ -1925,6 +2116,75 @@ async function saveCredential() {
     console.error('saveCredential error:', e);
   } finally {
     document.getElementById('credSaveBtn').disabled = false;
+    hideLoading();
+  }
+}
+
+// ============================================================
+// Closed days modal
+// ============================================================
+
+function openClosedDaysModal() {
+  // 曜日チェックボックスを反映
+  for (let i = 0; i < 7; i++) {
+    document.getElementById('dow' + i).checked = closedWeekdays.has(i);
+  }
+  // 特定日ボタングリッドを構築
+  buildClosedDatesGrid();
+  document.getElementById('closedDaysModal').classList.add('open');
+}
+
+function buildClosedDatesGrid() {
+  const { year, month } = MONTHS[currentMonthIdx];
+  const allDates = [...firstHalfDates(year, month), ...secondHalfDates(year, month)];
+  const grid = document.getElementById('closedDatesGrid');
+  grid.innerHTML = '';
+  allDates.forEach(d => {
+    const ds = fmt(d);
+    const isDowClosed = closedWeekdays.has(d.getDay());
+    const btn = document.createElement('button');
+    btn.className = 'closed-date-btn' +
+      (isDowClosed ? ' dow-closed' : closedDates.has(ds) ? ' active' : '');
+    btn.textContent = `${d.getMonth()+1}/${d.getDate()}(${DOW_JP[d.getDay()]})`;
+    btn.dataset.ds = ds;
+    if (!isDowClosed) {
+      btn.onclick = () => btn.classList.toggle('active');
+    }
+    grid.appendChild(btn);
+  });
+}
+
+function closeClosedDaysModal() {
+  document.getElementById('closedDaysModal').classList.remove('open');
+}
+
+async function saveClosedDays() {
+  const { year, month } = MONTHS[currentMonthIdx];
+  // 曜日
+  const newWeekdays = new Set();
+  for (let i = 0; i < 7; i++) {
+    if (document.getElementById('dow' + i).checked) newWeekdays.add(i);
+  }
+  // 特定日
+  const newDates = new Set();
+  document.querySelectorAll('#closedDatesGrid .closed-date-btn.active').forEach(btn => {
+    newDates.add(btn.dataset.ds);
+  });
+
+  showLoading();
+  try {
+    await Promise.all([
+      dbSaveSettings(newWeekdays),
+      dbSaveClosedDates(year, month, newDates),
+    ]);
+    closedWeekdays = newWeekdays;
+    closedDates    = newDates;
+    closeClosedDaysModal();
+    renderShiftTable();
+  } catch(e) {
+    alert('保存に失敗しました。再度お試しください。');
+    console.error('saveClosedDays error:', e);
+  } finally {
     hideLoading();
   }
 }
