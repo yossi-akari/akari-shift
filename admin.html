@@ -414,9 +414,10 @@
       cursor: pointer;
       font-family: inherit;
     }
-    .popup-opt.maru  { border-color: #4a9a40; color: #2a6a20; background: #e8f5e3; }
-    .popup-opt.batsu { border-color: #aa4444; color: #aa3333; background: #f5e3e3; }
-    .popup-opt.clear { color: #888; }
+    .popup-opt.maru       { border-color: #4a9a40; color: #2a6a20; background: #e8f5e3; }
+    .popup-opt.batsu      { border-color: #aa4444; color: #aa3333; background: #f5e3e3; }
+    .popup-opt.time-quick { border-color: #b07a00; color: #7a5000; background: #fff8e0; font-weight: bold; }
+    .popup-opt.clear      { color: #888; }
     .popup-time-row { display: flex; gap: 4px; align-items: center; }
     .popup-time-input {
       width: 64px;
@@ -989,12 +990,14 @@
 <div id="cellPopup">
   <div class="popup-title" id="popupTitle"></div>
   <div class="popup-options">
-    <button class="popup-opt maru"  onclick="applyCell('○')">○</button>
-    <button class="popup-opt batsu" onclick="applyCell('×')">×</button>
-    <button class="popup-opt clear" onclick="applyCell('')">クリア</button>
+    <button class="popup-opt maru"       onclick="applyCell('○')">○</button>
+    <button class="popup-opt batsu"      onclick="applyCell('×')">×</button>
+    <button class="popup-opt time-quick" onclick="applyCell('9-14')">9-14</button>
+    <button class="popup-opt time-quick" onclick="applyCell('14-18')">14-18</button>
+    <button class="popup-opt clear"      onclick="applyCell('')">クリア</button>
   </div>
   <div class="popup-time-row">
-    <input type="text" class="popup-time-input" id="timeInput" placeholder="14-18">
+    <input type="text" class="popup-time-input" id="timeInput" placeholder="例: 10-15">
     <button class="popup-time-btn" onclick="applyTimeCell()">時間設定</button>
   </div>
 </div>
@@ -1561,17 +1564,18 @@ function computeAlloc() {
     return Math.round(periodDays / 7 * (s[field] || 0));
   }
 
+  // Returns true if v represents a worked day (any value except empty/×)
+  function isWork(v) { return v && v !== '×'; }
+
   // Bug fix F: in keep mode, don't count × as work and don't allocate over ×
-  function allocStaff(s, pool, t) {
+  function allocStaff(s, pool, t, value = '○') {
     if (!result[s.name]) result[s.name] = {};
-    const filled = Object.keys(result[s.name]).filter(ds => result[s.name][ds] === '○');
-    // Available: in pool, not already ○, and not marked × in keep mode
-    const avail = pool.filter(ds => {
-      const existing = result[s.name][ds];
-      return existing !== '○' && existing !== '×';
-    });
+    // Count any already-assigned work day (○, 9-14, 14-18, etc.)
+    const filled = Object.keys(result[s.name]).filter(ds => isWork(result[s.name][ds]));
+    // Available: in pool, not yet assigned (falsy = no value)
+    const avail = pool.filter(ds => !result[s.name][ds]);
     const need = Math.max(0, t - filled.length);
-    selectEvenly(avail, need).forEach(ds => { result[s.name][ds] = '○'; });
+    selectEvenly(avail, need).forEach(ds => { result[s.name][ds] = value; });
   }
 
   const kitsuke  = staff.filter(s => s.role === '着付');
@@ -1579,28 +1583,25 @@ function computeAlloc() {
   const katazuke = staff.filter(s => s.role === '片付');
   const mix      = staff.filter(s => s.role === '着付/片付');
 
-  // Phase 1: 着付
+  // Phase 1: 着付 → 9-14
   kitsuke.forEach(s => {
     const pool = availDates(s).map(fmt);
-    allocStaff(s, pool, target(s, 'daysPerWeek'));
+    allocStaff(s, pool, target(s, 'daysPerWeek'), '9-14');
   });
 
-  // Collect all kitsuke-allocated days
+  // Collect all kitsuke-allocated days (any work value counts)
   const kitsukeDays = new Set();
   kitsuke.forEach(s => {
     if (result[s.name]) {
-      Object.entries(result[s.name]).forEach(([ds, v]) => { if (v === '○') kitsukeDays.add(ds); });
+      Object.entries(result[s.name]).forEach(([ds, v]) => { if (isWork(v)) kitsukeDays.add(ds); });
     }
   });
 
-  // Phase 2: 美容 — prefer days that overlap with 着付
+  // Phase 2: 美容 → 9-14 (prefer days that overlap with 着付)
   biyou.forEach(s => {
     if (!result[s.name]) result[s.name] = {};
-    const filled = Object.keys(result[s.name]).filter(ds => result[s.name][ds] === '○');
-    const avail  = availDates(s).map(fmt).filter(ds => {
-      const existing = result[s.name][ds];
-      return existing !== '○' && existing !== '×';
-    });
+    const filled = Object.keys(result[s.name]).filter(ds => isWork(result[s.name][ds]));
+    const avail  = availDates(s).map(fmt).filter(ds => !result[s.name][ds]);
     const need      = Math.max(0, target(s, 'daysPerWeek') - filled.length);
     const preferred = avail.filter(ds =>  kitsukeDays.has(ds));
     const others    = avail.filter(ds => !kitsukeDays.has(ds));
@@ -1610,23 +1611,20 @@ function computeAlloc() {
     } else {
       selected = [...preferred, ...selectEvenly(others, need - preferred.length)];
     }
-    selected.forEach(ds => { result[s.name][ds] = '○'; });
+    selected.forEach(ds => { result[s.name][ds] = '9-14'; });
   });
 
-  // Phase 3: 片付け (独立)
+  // Phase 3: 片付け → 14-18 (独立)
   katazuke.forEach(s => {
     const pool = availDates(s).map(fmt);
-    allocStaff(s, pool, target(s, 'daysPerWeek'));
+    allocStaff(s, pool, target(s, 'daysPerWeek'), '14-18');
   });
 
-  // Phase 4: 着付/片付け (河野型)
+  // Phase 4: 着付/片付け (河野型) → kitsuke部分 9-14 / katazuke部分 14-18
   mix.forEach(s => {
     if (!result[s.name]) result[s.name] = {};
-    const avail = availDates(s).map(fmt).filter(ds => {
-      const existing = result[s.name][ds];
-      return existing !== '○' && existing !== '×';
-    });
-    const filled    = Object.keys(result[s.name]).filter(ds => result[s.name][ds] === '○');
+    const avail = availDates(s).map(fmt).filter(ds => !result[s.name][ds]);
+    const filled    = Object.keys(result[s.name]).filter(ds => isWork(result[s.name][ds]));
     const filledKit = filled.filter(ds =>  kitsukeDays.has(ds)).length;
     const filledKat = filled.filter(ds => !kitsukeDays.has(ds)).length;
 
@@ -1635,11 +1633,11 @@ function computeAlloc() {
 
     const kitPool    = avail.filter(ds => kitsukeDays.has(ds));
     const kitSelected = selectEvenly(kitPool, needKit);
-    kitSelected.forEach(ds => { result[s.name][ds] = '○'; });
+    kitSelected.forEach(ds => { result[s.name][ds] = '9-14'; });
 
     const kitSet  = new Set(kitSelected);
     const katPool = avail.filter(ds => !kitSet.has(ds));
-    selectEvenly(katPool, needKat).forEach(ds => { result[s.name][ds] = '○'; });
+    selectEvenly(katPool, needKat).forEach(ds => { result[s.name][ds] = '14-18'; });
   });
 
   return result;
@@ -1673,16 +1671,16 @@ async function previewAlloc() {
     const biyouDays = new Set();
     staff.filter(s => s.role === '着付').forEach(s => {
       if (pendingAlloc[s.name])
-        Object.entries(pendingAlloc[s.name]).forEach(([ds, v]) => { if (v === '○') kitDays.add(ds); });
+        Object.entries(pendingAlloc[s.name]).forEach(([ds, v]) => { if (v && v !== '×') kitDays.add(ds); });
     });
     staff.filter(s => s.role === '美容').forEach(s => {
       if (pendingAlloc[s.name])
-        Object.entries(pendingAlloc[s.name]).forEach(([ds, v]) => { if (v === '○') biyouDays.add(ds); });
+        Object.entries(pendingAlloc[s.name]).forEach(([ds, v]) => { if (v && v !== '×') biyouDays.add(ds); });
     });
     const paired = [...kitDays].filter(ds => biyouDays.has(ds)).length;
 
     let html = `<p style="font-size:11px;color:#888;margin-bottom:10px">
-      モード: ${allocMode === 'keep' ? '休み希望以外に割り振り（既存の○を保持）' : '全リセットして割り振り'}
+      モード: ${allocMode === 'keep' ? '休み希望以外に割り振り（既存の割り振りを保持）' : '全リセットして割り振り'}
     </p>`;
     html += `<div class="pairing-stat">
       着付・美容ペア確認　着付日数: ${kitDays.size}日 / 美容日数: ${biyouDays.size}日 / 同日重複: ${paired}日
@@ -1696,7 +1694,7 @@ async function previewAlloc() {
 
       roleStaff.forEach(s => {
         const entries = pendingAlloc[s.name]
-          ? Object.entries(pendingAlloc[s.name]).filter(([, v]) => v === '○')
+          ? Object.entries(pendingAlloc[s.name]).filter(([, v]) => v && v !== '×')
           : [];
         const cnt  = entries.length;
         const days = entries.map(([ds]) => {
