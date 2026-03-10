@@ -414,6 +414,97 @@
     }
     .chpw-btn:hover { background: rgba(255,255,255,0.1); }
 
+    /* View toggle (自分/全員) */
+    .view-toggle {
+      display: flex;
+      margin-bottom: 12px;
+      border: 1px solid #c49a7a;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .view-toggle-btn {
+      flex: 1;
+      padding: 9px;
+      background: #fff;
+      border: none;
+      border-right: 1px solid #c49a7a;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      color: #888;
+    }
+    .view-toggle-btn:last-child { border-right: none; }
+    .view-toggle-btn.active { background: #6b3a2a; color: #fff; font-weight: bold; }
+
+    /* All-staff shift table */
+    .ast-wrap {
+      overflow-x: auto;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 12px;
+      background: #fff;
+    }
+    .all-shift-table {
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+    .all-shift-table th,
+    .all-shift-table td {
+      border: 1px solid #e0d8d0;
+      padding: 0;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .ast-name {
+      min-width: 42px;
+      padding: 3px 5px;
+      font-size: 10px;
+      font-weight: bold;
+      text-align: left;
+      white-space: nowrap;
+      background: #fff;
+    }
+    .ast-name.my-row  { background: #fff8e8; }
+    .kitsuke-name     { background: #f4faf2; }
+    .biyou-name       { background: #f2f4fa; }
+    .katazuke-name    { background: #faf8f2; }
+    .mix-name         { background: #f8f2fa; }
+    .ast-date-th {
+      min-width: 26px;
+      max-width: 26px;
+      padding: 2px 1px;
+      background: #fafaf8;
+      line-height: 1.3;
+    }
+    .ast-date-th .dn { font-size: 9px; font-weight: bold; display: block; }
+    .ast-date-th .dd { font-size: 7px; display: block; }
+    .ast-date-th.sat { background: #edf2fb; color: #4466aa; }
+    .ast-date-th.sun { background: #fbedef; color: #aa4444; }
+    .ast-date-th.closed-col { background: #c8c8c8 !important; color: #666; }
+    .ast-cell {
+      min-width: 26px;
+      height: 22px;
+      font-size: 9px;
+    }
+    .ast-cell.closed-col { background: #e0e0e0; }
+    .ast-cell.val-maru   { background: #e8f5e3; color: #2a6a20; font-weight: bold; }
+    .ast-cell.val-batsu  { background: #f5e3e3; color: #aa3333; }
+    .ast-cell.val-time   { background: #fffde8; color: #7a6a00; font-size: 7px; }
+    .ast-cell.my-row     { background: #fffbf0; }
+    .ast-cell.my-row.val-maru { background: #c5e8b5; }
+    .ast-cell.my-row.val-time { background: #fef5c0; }
+    .ast-role-row td {
+      padding: 2px 6px;
+      font-size: 9px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-align: left;
+    }
+    .rh-kitsuke  { background: #e8f5e3; color: #3a6e30; }
+    .rh-biyou    { background: #e3e8f5; color: #30406e; }
+    .rh-katazuke { background: #f5f0e3; color: #6e5830; }
+    .rh-mix      { background: #f0e3f5; color: #5a2e6e; }
+
     /* Shift view */
     .shift-summary {
       background: #fff;
@@ -510,7 +601,12 @@
 
   <!-- シフト確認 tab -->
   <div id="secShift" class="page" style="padding-top:0;display:none">
-    <div id="shiftViewArea"></div>
+    <div class="view-toggle">
+      <button class="view-toggle-btn active" id="viewMineBtn" onclick="showShiftView('mine')">自分のシフト</button>
+      <button class="view-toggle-btn"        id="viewAllBtn"  onclick="showShiftView('all')">全員のシフト</button>
+    </div>
+    <div id="shiftViewMine"></div>
+    <div id="shiftViewAll" hidden></div>
   </div>
 </div>
 
@@ -572,6 +668,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 let selectedStaff   = null;
 let currentMonthIdx = 0;
 let currentMainTab  = 'req';
+let currentShiftView = 'mine'; // 'mine' | 'all'
 let currentRequests = {};   // { dateStr: '×' }
 let currentSubmittedAt = null;
 
@@ -726,8 +823,9 @@ function enterMainView(staffObj) {
     const { year, month } = MONTHS[i];
     if (new Date(year, month - 1, 25) >= today) { defaultIdx = i; break; }
   }
-  currentMonthIdx = defaultIdx;
-  currentMainTab  = 'req';
+  currentMonthIdx  = defaultIdx;
+  currentMainTab   = 'req';
+  currentShiftView = 'mine';
 
   buildMonthTabs();
 
@@ -737,6 +835,10 @@ function enterMainView(staffObj) {
   document.getElementById('tabShift').classList.remove('active');
   document.getElementById('secReq').style.display   = '';
   document.getElementById('secShift').style.display = 'none';
+  document.getElementById('viewMineBtn').classList.add('active');
+  document.getElementById('viewAllBtn').classList.remove('active');
+  document.getElementById('shiftViewMine').hidden = false;
+  document.getElementById('shiftViewAll').hidden  = true;
 
   loadAndRenderReq();
 }
@@ -751,7 +853,20 @@ function showMainTab(tab) {
   document.getElementById('tabShift').classList.toggle('active', tab === 'shift');
   document.getElementById('secReq').style.display   = tab === 'req'   ? '' : 'none';
   document.getElementById('secShift').style.display = tab === 'shift' ? '' : 'none';
-  if (tab === 'shift') renderShiftView();
+  if (tab === 'shift') {
+    if (currentShiftView === 'mine') renderShiftView();
+    else renderAllShiftView();
+  }
+}
+
+function showShiftView(view) {
+  currentShiftView = view;
+  document.getElementById('viewMineBtn').classList.toggle('active', view === 'mine');
+  document.getElementById('viewAllBtn').classList.toggle('active',  view === 'all');
+  document.getElementById('shiftViewMine').hidden = (view !== 'mine');
+  document.getElementById('shiftViewAll').hidden  = (view !== 'all');
+  if (view === 'mine') renderShiftView();
+  else renderAllShiftView();
 }
 
 // ============================================================
@@ -769,7 +884,8 @@ function buildMonthTabs() {
       currentMonthIdx = idx;
       buildMonthTabs();
       if (currentMainTab === 'req') loadAndRenderReq();
-      else renderShiftView();
+      else if (currentShiftView === 'mine') renderShiftView();
+      else renderAllShiftView();
     };
     container.appendChild(btn);
   });
@@ -939,7 +1055,7 @@ async function renderShiftView() {
     const hasAny   = all.some(d => myShift[fmt(d)]);
 
     if (!hasAny) {
-      document.getElementById('shiftViewArea').innerHTML =
+      document.getElementById('shiftViewMine').innerHTML =
         `<div class="shift-unconfirmed">
           令和${reiwaYear(year)}年${month}月のシフトはまだ確定していません。
         </div>`;
@@ -956,9 +1072,9 @@ async function renderShiftView() {
     html += `<div class="half-label">▶ 後半（${month}月11日〜${month}月25日）</div>`;
     html += buildShiftGrid(sh, myShift);
 
-    document.getElementById('shiftViewArea').innerHTML = html;
+    document.getElementById('shiftViewMine').innerHTML = html;
   } catch(e) {
-    document.getElementById('shiftViewArea').innerHTML =
+    document.getElementById('shiftViewMine').innerHTML =
       '<div class="shift-unconfirmed">データの読み込みに失敗しました。</div>';
     console.error('renderShiftView error:', e);
   } finally {
@@ -995,6 +1111,108 @@ function buildShiftGrid(dates, myShift) {
   });
 
   html += '</div>';
+  return html;
+}
+
+// ============================================================
+// 全員のシフト確認
+// ============================================================
+
+const ROLE_ORDER_ALL = ['着付', '美容', '片付', '着付/片付'];
+const ROLE_LABELS_ALL = { '着付': '着付担当', '美容': '美容担当', '片付': '片付け担当', '着付/片付': '着付/片付け' };
+const ROLE_CLS_ALL   = { '着付': 'rh-kitsuke', '美容': 'rh-biyou', '片付': 'rh-katazuke', '着付/片付': 'rh-mix' };
+const NAME_CLS_ALL   = { '着付': 'kitsuke-name', '美容': 'biyou-name', '片付': 'katazuke-name', '着付/片付': 'mix-name' };
+
+async function renderAllShiftView() {
+  const { year, month } = getMonth();
+  const container = document.getElementById('shiftViewAll');
+  showLoading();
+  try {
+    const yy = String(year);
+    const mm = String(month).padStart(2, '0');
+    const [staffRes, shiftsRes, cwRes, cdRes] = await Promise.all([
+      sb.from('staff').select('name,role'),
+      sb.from('shifts').select('staff_name,date_str,value').eq('year', year).eq('month', month),
+      sb.from('settings').select('value').eq('key', 'closed_weekdays').maybeSingle(),
+      sb.from('settings').select('value').eq('key', `closed_dates_${yy}_${mm}`).maybeSingle(),
+    ]);
+
+    const staffRows     = staffRes.data  || [];
+    const shiftsRows    = shiftsRes.data || [];
+    const closedWeekdays = new Set(Array.isArray(cwRes.data?.value) ? cwRes.data.value : []);
+    const closedDates    = new Set(Array.isArray(cdRes.data?.value) ? cdRes.data.value : []);
+
+    // Build lookup: { staffName: { dateStr: value } }
+    const allShifts = {};
+    shiftsRows.forEach(r => {
+      if (!allShifts[r.staff_name]) allShifts[r.staff_name] = {};
+      allShifts[r.staff_name][r.date_str] = r.value;
+    });
+
+    const fh = firstHalfDates(year, month);
+    const sh = secondHalfDates(year, month);
+    const py = month === 1 ? year - 1 : year;
+    const pm = month === 1 ? 12 : month - 1;
+
+    let html = `<div class="period-info">
+      令和${reiwaYear(year)}年${month}月分　${py}年${pm}月26日〜${year}年${month}月25日
+    </div>`;
+    html += `<div class="half-label">▶ 前半（${pm}月26日〜${month}月10日）</div>`;
+    html += buildAllTable(fh, staffRows, allShifts, closedWeekdays, closedDates);
+    html += `<div class="half-label" style="margin-top:10px">▶ 後半（${month}月11日〜${month}月25日）</div>`;
+    html += buildAllTable(sh, staffRows, allShifts, closedWeekdays, closedDates);
+
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = '<div class="shift-unconfirmed">データの読み込みに失敗しました。</div>';
+    console.error('renderAllShiftView error:', e);
+  } finally {
+    hideLoading();
+  }
+}
+
+function buildAllTable(dates, staffRows, allShifts, closedWeekdays, closedDates) {
+  const DOW = ['日','月','火','水','木','金','土'];
+  let html = '<div class="ast-wrap"><table class="all-shift-table"><thead><tr>';
+  html += '<th class="ast-name">スタッフ</th>';
+  dates.forEach(date => {
+    const dow = date.getDay();
+    const ds  = fmt(date);
+    const isClosed = closedWeekdays.has(dow) || closedDates.has(ds);
+    let cls = 'ast-date-th';
+    if (isClosed)     cls += ' closed-col';
+    else if (dow === 6) cls += ' sat';
+    else if (dow === 0) cls += ' sun';
+    html += `<th class="${cls}"><span class="dn">${date.getDate()}</span><span class="dd">${DOW[dow]}</span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  ROLE_ORDER_ALL.forEach(role => {
+    const roleStaff = staffRows.filter(s => s.role === role);
+    if (!roleStaff.length) return;
+    html += `<tr class="ast-role-row"><td colspan="${dates.length + 1}" class="${ROLE_CLS_ALL[role]}">${ROLE_LABELS_ALL[role]}</td></tr>`;
+    roleStaff.forEach(s => {
+      const isMe   = s.name === selectedStaff.name;
+      const nameCls = NAME_CLS_ALL[role] || '';
+      html += `<tr><td class="ast-name ${nameCls}${isMe ? ' my-row' : ''}">${s.name}</td>`;
+      dates.forEach(date => {
+        const dow      = date.getDay();
+        const ds       = fmt(date);
+        const isClosed = closedWeekdays.has(dow) || closedDates.has(ds);
+        const val      = allShifts[s.name]?.[ds] || '';
+        let cls = 'ast-cell';
+        if (isClosed)       cls += ' closed-col';
+        else if (val === '○') cls += ' val-maru';
+        else if (val === '×') cls += ' val-batsu';
+        else if (val)         cls += ' val-time';
+        if (isMe && !isClosed) cls += ' my-row';
+        html += `<td class="${cls}">${isClosed ? '' : val}</td>`;
+      });
+      html += '</tr>';
+    });
+  });
+
+  html += '</tbody></table></div>';
   return html;
 }
 
