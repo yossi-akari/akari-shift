@@ -563,6 +563,115 @@
     .cred-input:focus { outline: none; border-color: #c49a7a; }
     .cred-error { font-size: 11px; color: #cc4444; margin-top: 4px; min-height: 16px; }
 
+    /* ===== Print ===== */
+    .print-title { display: none; }
+
+    @media print {
+      @page { size: A4 portrait; margin: 8mm; }
+
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+      body { background: #fff; }
+
+      /* Hide everything not needed */
+      header,
+      .month-tabs-wrap,
+      .section-tabs,
+      .toolbar,
+      .notes-section,
+      #sec-requests,
+      #sec-settings,
+      #cellPopup,
+      #previewModal,
+      #closedDaysModal,
+      #credModal,
+      #apwModal,
+      .loading-overlay,
+      #adminLoginScreen { display: none !important; }
+
+      /* Show only shift section */
+      .main { padding: 0; }
+      .section-content { display: none !important; }
+      #sec-shift { display: block !important; }
+
+      /* Print title */
+      .print-title {
+        display: block !important;
+        font-size: 13px;
+        font-weight: bold;
+        color: #3a2a1a;
+        margin-bottom: 5px;
+      }
+
+      /* Period info compact */
+      .period-info {
+        font-size: 8px;
+        padding: 3px 6px;
+        margin-bottom: 5px;
+      }
+
+      /* Half labels */
+      .half-label {
+        font-size: 9px;
+        margin: 5px 0 2px;
+      }
+
+      /* Table container: no scroll, no shadow */
+      .table-wrap {
+        overflow: visible;
+        box-shadow: none;
+        border-radius: 0;
+      }
+
+      /* Compact table */
+      .shift-table {
+        font-size: 8px;
+        width: 100%;
+        table-layout: fixed;
+      }
+      .shift-table th,
+      .shift-table td { border: 1px solid #bbb; padding: 0; }
+
+      /* Name column */
+      .name-col {
+        width: 26mm;
+        min-width: unset;
+        max-width: unset;
+        position: static;
+        font-size: 8px;
+        padding: 1px 2px;
+      }
+
+      /* Date header */
+      .date-th {
+        min-width: unset;
+        max-width: unset;
+        padding: 1px;
+        line-height: 1.2;
+      }
+      .date-th .date-num { font-size: 8px; }
+      .date-th .date-dow { font-size: 7px; }
+      .date-th.closed .closed-label { font-size: 7px; }
+
+      /* Role header row */
+      .role-header-row td { padding: 2px 4px; font-size: 8px; }
+
+      /* Shift cells */
+      .shift-cell {
+        min-width: unset;
+        height: 18px;
+        font-size: 8px;
+        cursor: default;
+      }
+      .shift-cell.val-time { font-size: 7px; }
+      .shift-cell:hover { background: inherit !important; }
+
+      /* No sticky in print */
+      .name-col { position: static !important; }
+
+      #secondHalfWrap { margin-top: 6px; }
+    }
+
     /* ===== Closed day ===== */
     .date-th.closed {
       background: #c8c8c8 !important;
@@ -914,12 +1023,15 @@
       <button class="toolbar-btn primary" onclick="previewAlloc()">自動割り振り</button>
       <button class="toolbar-btn" onclick="openClosedDaysModal()">定休日設定</button>
       <button class="toolbar-btn danger" onclick="resetShift()">シフトをリセット</button>
+      <button class="toolbar-btn" onclick="printShift()">🖨 印刷</button>
       <button class="toolbar-btn" onclick="exportData()">エクスポート</button>
       <label class="toolbar-btn" style="cursor:pointer">
         インポート
         <input type="file" id="importInput" accept=".json" onchange="importData(event)">
       </label>
     </div>
+
+    <div class="print-title" id="printTitle"></div>
 
     <div class="period-info" id="periodInfo"></div>
 
@@ -1972,6 +2084,12 @@ function debounceSaveNotes() {
 // ============================================================
 // Export / Import
 // ============================================================
+
+function printShift() {
+  const { year, month } = MONTHS[currentMonthIdx];
+  document.getElementById('printTitle').textContent = `${year}年${month}月　シフト表`;
+  window.print();
+}
 
 async function exportData() {
   const { year, month } = MONTHS[currentMonthIdx];
