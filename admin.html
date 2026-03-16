@@ -309,7 +309,7 @@
     .shift-table {
       border-collapse: collapse;
       font-size: 11px;
-      min-width: 100%;
+      width: auto;
     }
     .shift-table th, .shift-table td {
       border: 1px solid #e0d8d0;
@@ -363,12 +363,13 @@
       min-width: 26px;
       height: 22px;
       position: relative;
-      font-size: 9px;
+      font-size: 11px;
+      font-weight: bold;
     }
     .shift-cell:hover { background: #fdf8f4 !important; }
     .shift-cell.val-maru { background: #e8f5e3; color: #2a6a20; font-weight: bold; }
     .shift-cell.val-batsu { background: #f5e3e3; color: #aa3333; font-weight: bold; }
-    .shift-cell.val-time { background: #fffde8; color: #7a6a00; font-size: 7px; }
+    .shift-cell.val-time { background: #fffde8; color: #7a6a00; font-size: 9px; font-weight: bold; }
     .shift-cell.req-off:not(.val-maru):not(.val-batsu):not(.val-time) { background: #fef2f2; }
     .req-dot {
       position: absolute;
