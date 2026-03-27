@@ -727,11 +727,10 @@ async function doLogin() {
   btn.disabled = true;
   showLoading();
   try {
-    const { data, error } = await sb
-      .from('staff')
-      .select('name,role,days_per_week,days_katazuke')
-      .eq('login_id', id)
-      .eq('password', pwd);
+    const { data, error } = await sb.rpc('verify_staff_login', {
+      p_login_id: id,
+      p_password: pwd,
+    });
 
     if (error) throw error;
 
@@ -1132,7 +1131,7 @@ async function renderAllShiftView() {
     const yy = String(year);
     const mm = String(month).padStart(2, '0');
     const [staffRes, shiftsRes, cwRes, cdRes] = await Promise.all([
-      sb.from('staff').select('name,role'),
+      sb.rpc('admin_get_all_staff'),
       sb.from('shifts').select('staff_name,date_str,value').eq('year', year).eq('month', month),
       sb.from('settings').select('value').eq('key', 'closed_weekdays').maybeSingle(),
       sb.from('settings').select('value').eq('key', `closed_dates_${yy}_${mm}`).maybeSingle(),
@@ -1250,22 +1249,13 @@ async function changePassword() {
   btn.disabled = true;
   showLoading();
   try {
-    // Verify current password
-    const { data, error } = await sb
-      .from('staff')
-      .select('name')
-      .eq('name', selectedStaff.name)
-      .eq('password', cur)
-      .maybeSingle();
+    const { data: ok, error } = await sb.rpc('change_staff_password', {
+      p_name:       selectedStaff.name,
+      p_current_pw: cur,
+      p_new_pw:     nw,
+    });
     if (error) throw error;
-    if (!data) { errEl.textContent = '現在のパスワードが正しくありません'; return; }
-
-    // Update to new password
-    const { error: updErr } = await sb
-      .from('staff')
-      .update({ password: nw })
-      .eq('name', selectedStaff.name);
-    if (updErr) throw updErr;
+    if (!ok) { errEl.textContent = '現在のパスワードが正しくありません'; return; }
 
     closePwModal();
     alert('パスワードを変更しました');

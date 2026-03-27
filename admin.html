@@ -1273,7 +1273,7 @@ async function dbLoadRequests(year, month) {
 }
 
 async function dbLoadStaff() {
-  const { data, error } = await sb.from('staff').select('*').order('sort_order');
+  const { data, error } = await sb.rpc('admin_get_all_staff');
   if (error) throw error;
   return data || [];
 }
@@ -2209,22 +2209,16 @@ async function saveCredential() {
   document.getElementById('credSaveBtn').disabled = true;
   showLoading();
   try {
-    // Check duplicate login_id
-    const { data: dup } = await sb
-      .from('staff')
-      .select('name')
-      .eq('login_id', id)
-      .neq('name', credModalTarget)
-      .maybeSingle();
-    if (dup) {
-      err.textContent = `このIDは${dup.name}が使用中です`;
+    const { data: result, error } = await sb.rpc('admin_set_staff_credentials', {
+      p_name:     credModalTarget,
+      p_login_id: id,
+      p_new_pw:   pw,
+    });
+    if (error) throw error;
+    if (result?.error === 'duplicate') {
+      err.textContent = `このIDは${result.name}が使用中です`;
       return;
     }
-
-    const { error } = await sb.from('staff')
-      .update({ login_id: id, password: pw })
-      .eq('name', credModalTarget);
-    if (error) throw error;
 
     closeCredModal();
     await renderSettings();
@@ -2324,15 +2318,13 @@ async function doAdminLogin() {
   btn.disabled = true;
   showLoading();
   try {
-    const { data, error } = await sb
-      .from('admins')
-      .select('login_id')
-      .eq('login_id', id)
-      .eq('password', pwd)
-      .maybeSingle();
+    const { data: ok, error } = await sb.rpc('verify_admin_login', {
+      p_login_id: id,
+      p_password: pwd,
+    });
     if (error) throw error;
 
-    if (!data) {
+    if (!ok) {
       err.textContent = 'IDまたはパスワードが正しくありません';
       document.getElementById('adminLoginPassword').value = '';
       return;
@@ -2405,21 +2397,13 @@ async function changeAdminPassword() {
   btn.disabled = true;
   showLoading();
   try {
-    // Verify current password
-    const { data, error } = await sb
-      .from('admins')
-      .select('login_id')
-      .eq('login_id', loggedInAdminId)
-      .eq('password', cur)
-      .maybeSingle();
+    const { data: ok, error } = await sb.rpc('change_admin_password', {
+      p_login_id:   loggedInAdminId,
+      p_current_pw: cur,
+      p_new_pw:     nw,
+    });
     if (error) throw error;
-    if (!data) { errEl.textContent = '現在のパスワードが正しくありません'; return; }
-
-    const { error: updErr } = await sb
-      .from('admins')
-      .update({ password: nw })
-      .eq('login_id', loggedInAdminId);
-    if (updErr) throw updErr;
+    if (!ok) { errEl.textContent = '現在のパスワードが正しくありません'; return; }
 
     closeApwModal();
     alert('パスワードを変更しました');
